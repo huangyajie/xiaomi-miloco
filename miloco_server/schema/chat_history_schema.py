@@ -26,6 +26,82 @@ class ChatHistoryMessages:
     def __init__(self, messages: Optional[list[ChatCompletionMessageParam]] = None):
         self._messages: list[ChatCompletionMessageParam] = messages if messages is not None else []
 
+    def _extract_tool_call_ids(self, tool_calls: Optional[list]) -> set[str]:
+        """Extract tool_call ids from assistant tool_calls field (supports dict or pydantic models)."""
+        ids: set[str] = set()
+        if not tool_calls:
+            return ids
+        for tool_call in tool_calls:
+            tc_id = None
+            if isinstance(tool_call, dict):
+                tc_id = tool_call.get("id")
+            else:
+                tc_id = getattr(tool_call, "id", None)
+            if tc_id:
+                ids.add(tc_id)
+        return ids
+
+    def _sanitize_incomplete_tool_calls(self) -> None:
+        """
+        Remove assistant messages that issued tool_calls but lack corresponding tool responses.
+
+        OpenAI API requires every assistant tool_call to be followed by tool messages that respond
+        to each tool_call_id. When a conversation is interrupted (e.g., user clicks Stop), the
+        assistant tool_call may remain without tool replies, causing subsequent LLM calls to fail.
+        This sanitizer drops such incomplete pairs to keep the message history valid.
+        """
+        if not self._messages:
+            return
+
+        cleaned: list[ChatCompletionMessageParam] = []
+        removed = False
+        i = 0
+        while i < len(self._messages):
+            msg = self._messages[i]
+            role = msg.get("role") if isinstance(msg, dict) else getattr(msg, "role", None)
+
+            if role == "assistant":
+                tool_calls = msg.get("tool_calls") if isinstance(msg, dict) else getattr(msg, "tool_calls", None)
+                tool_call_ids = self._extract_tool_call_ids(tool_calls)
+
+                if tool_call_ids:
+                    # Collect consecutive tool messages following this assistant message
+                    tool_msgs: list[ChatCompletionMessageParam] = []
+                    j = i + 1
+                    while j < len(self._messages):
+                        next_msg = self._messages[j]
+                        next_role = next_msg.get("role") if isinstance(next_msg, dict) else getattr(next_msg, "role", None)
+                        if next_role == "tool":
+                            tool_msgs.append(next_msg)
+                            j += 1
+                            continue
+                        break
+
+                    matched_ids: set[str] = set()
+                    for tool_msg in tool_msgs:
+                        tc_id = tool_msg.get("tool_call_id") if isinstance(tool_msg, dict) else getattr(tool_msg, "tool_call_id", None)
+                        if tc_id:
+                            matched_ids.add(tc_id)
+
+                    if not tool_call_ids.issubset(matched_ids):
+                        # Incomplete tool call, drop assistant message (and any collected tool messages)
+                        removed = True
+                        i = j
+                        continue
+
+                    # Complete tool call sequence, keep assistant and tool messages together
+                    cleaned.append(msg)
+                    cleaned.extend(tool_msgs)
+                    i = j
+                    continue
+
+            cleaned.append(msg)
+            i += 1
+
+        if removed:
+            logger.info("Removed %d incomplete tool call messages from history", len(self._messages) - len(cleaned))
+            self._messages = cleaned
+
     def add_content(self, role: str, content: str):
         """
         Add message
@@ -78,6 +154,7 @@ class ChatHistoryMessages:
         """
         Get messages
         """
+        self._sanitize_incomplete_tool_calls()
         return self._messages
 
     def to_json(self) -> str:
@@ -85,6 +162,7 @@ class ChatHistoryMessages:
         Convert messages to JSON
         """
         try:
+            self._sanitize_incomplete_tool_calls()
             return json.dumps(self._messages, ensure_ascii=False)
         except (ValueError, TypeError) as e:
             logger.error("Error serializing messages: %s", e, exc_info=True)
