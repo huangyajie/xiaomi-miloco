@@ -68,7 +68,11 @@ class ChatHistoryMessages:
             role = msg.get("role") if isinstance(msg, dict) else getattr(msg, "role", None)
 
             if role == "assistant":
-                tool_calls = msg.get("tool_calls") if isinstance(msg, dict) else getattr(msg, "tool_calls", None)
+                tool_calls = (
+                    msg.get("tool_calls")
+                    if isinstance(msg, dict)
+                    else getattr(msg, "tool_calls", None)
+                )
                 tool_call_ids = self._extract_tool_call_ids(tool_calls)
 
                 if tool_call_ids:
@@ -76,7 +80,11 @@ class ChatHistoryMessages:
                     j = i + 1
                     while j < len(self._messages):
                         next_msg = self._messages[j]
-                        next_role = next_msg.get("role") if isinstance(next_msg, dict) else getattr(next_msg, "role", None)
+                        next_role = (
+                            next_msg.get("role")
+                            if isinstance(next_msg, dict)
+                            else getattr(next_msg, "role", None)
+                        )
                         if next_role == "tool":
                             tool_msgs.append(next_msg)
                             j += 1
@@ -85,7 +93,11 @@ class ChatHistoryMessages:
 
                     matched_ids: set[str] = set()
                     for tool_msg in tool_msgs:
-                        tc_id = tool_msg.get("tool_call_id") if isinstance(tool_msg, dict) else getattr(tool_msg, "tool_call_id", None)
+                        tc_id = (
+                            tool_msg.get("tool_call_id")
+                            if isinstance(tool_msg, dict)
+                            else getattr(tool_msg, "tool_call_id", None)
+                        )
                         if tc_id:
                             matched_ids.add(tc_id)
 
@@ -93,7 +105,11 @@ class ChatHistoryMessages:
                         # Also drop the triggering user message if it is immediately before this assistant.
                         if cleaned:
                             prev_msg = cleaned[-1]
-                            prev_role = prev_msg.get("role") if isinstance(prev_msg, dict) else getattr(prev_msg, "role", None)
+                            prev_role = (
+                                prev_msg.get("role")
+                                if isinstance(prev_msg, dict)
+                                else getattr(prev_msg, "role", None)
+                            )
                             if prev_role == "user":
                                 cleaned.pop()
                         removed = True
@@ -109,7 +125,9 @@ class ChatHistoryMessages:
             i += 1
 
         if removed:
-            logger.info("Removed %d incomplete tail tool call messages from history", len(self._messages) - len(cleaned))
+            logger.info(
+                "Removed %d incomplete tail tool call messages from history",
+                len(self._messages) - len(cleaned))
             self._messages = cleaned
 
         # Mark sanitized up to current length
