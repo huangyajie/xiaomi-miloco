@@ -347,6 +347,9 @@ class MIoTLan:
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            # Allow binding the same UDP port on multiple interfaces (needed on macOS).
+            if hasattr(socket, "SO_REUSEPORT"):
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
             self.__bind_socket_to_interface(sock=sock, if_name=if_name)
             sock.bind(("", self._local_port or 0))
             self._internal_loop.add_reader(sock.fileno(), self.__socket_read_handler, (if_name, sock))
