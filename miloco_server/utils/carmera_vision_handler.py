@@ -16,6 +16,7 @@ from typing import Any, Callable, Coroutine, List
 from miloco_server.schema.miot_schema import CameraImgInfo, CameraImgSeq, CameraInfo
 from miot.camera import MIoTCameraInstance
 from miot.types import MIoTCameraInfo
+from miot.rtsp_camera import RTSPCameraInstance, RtspCameraInfo
 
 logger = logging.getLogger(__name__)
 
@@ -115,7 +116,26 @@ class SizeLimitedQueue:
             return recent_items
 
 
-class CameraVisionHandler:
+class BaseCameraVisionHandler:
+    """Base camera vision handler strategy."""
+
+    async def register_raw_stream(self, callback: Callable[[str, bytes, int, int, int], Coroutine], channel: int):
+        raise NotImplementedError
+
+    async def unregister_raw_stream(self, channel: int):
+        raise NotImplementedError
+
+    async def update_camera_info(self, camera_info: Any) -> None:
+        raise NotImplementedError
+
+    def get_recents_camera_img(self, channel: int, n: int) -> CameraImgSeq:
+        raise NotImplementedError
+
+    async def destroy(self) -> None:
+        raise NotImplementedError
+
+
+class CameraVisionHandler(BaseCameraVisionHandler):
     """Camera vision handler for managing camera image streams"""
 
     def __init__(self, camera_info: MIoTCameraInfo, miot_camera_instance: MIoTCameraInstance, max_size: int, ttl: int):
@@ -169,3 +189,58 @@ class CameraVisionHandler:
             self.camera_img_queues[channel].clear()
 
         await self.miot_camera_instance.destroy_async()
+
+
+class RtspCameraVisionHandler(BaseCameraVisionHandler):
+    """RTSP camera vision handler using libcamera_rtsp."""
+
+    def __init__(self, camera_info: RtspCameraInfo, rtsp_camera_instance: RTSPCameraInstance, max_size: int, ttl: int):
+        self.camera_info = camera_info
+        self.rtsp_camera_instance = rtsp_camera_instance
+        self.camera_img_queues: dict[int, SizeLimitedQueue] = {}
+
+        for channel in range(self.camera_info.channel_count or 1):
+            self.camera_img_queues[channel] = SizeLimitedQueue(max_size=max_size, ttl=ttl)
+            asyncio.create_task(self.rtsp_camera_instance.register_decode_jpg_async(self.add_camera_img, channel))
+
+        logger.info("RtspCameraVisionHandler init success, camera did: %s", self.camera_info.did)
+
+    async def register_raw_stream(self, callback: Callable[[str, bytes, int, int, int], Coroutine], channel: int):
+        await self.rtsp_camera_instance.register_raw_video_async(callback, channel)
+
+    async def unregister_raw_stream(self, channel: int):
+        await self.rtsp_camera_instance.unregister_raw_video_async(channel)
+
+    async def add_camera_img(self, did: str, data: bytes, ts: int, channel: int):
+        logger.debug("rtsp add_camera_img camera_id: %s, camera timestamp: %d, image_size: %d", did, ts, len(data))
+        self.camera_img_queues[channel].put(CameraImgInfo(data=data, timestamp=int(time.time())))
+
+    async def update_camera_info(self, camera_info: RtspCameraInfo) -> None:
+        self.camera_info = camera_info
+        if self.camera_info.online:
+            for channel in range(self.camera_info.channel_count or 1):
+                await self.rtsp_camera_instance.register_decode_jpg_async(self.add_camera_img, channel)
+        else:
+            for channel in range(self.camera_info.channel_count or 1):
+                await self.rtsp_camera_instance.unregister_decode_jpg_async(channel)
+                self.camera_img_queues[channel].clear()
+
+    def get_recents_camera_img(self, channel: int, n: int) -> CameraImgSeq:
+        if self.camera_info.online:
+            return CameraImgSeq(
+                camera_info=CameraInfo.model_validate(self.camera_info.model_dump()),
+                channel=channel,
+                img_list=self.camera_img_queues[channel].get_recent(n))
+        else:
+            return CameraImgSeq(
+                camera_info=CameraInfo.model_validate(self.camera_info.model_dump()),
+                channel=channel,
+                img_list=[])
+
+    async def destroy(self) -> None:
+        for channel in range(self.camera_info.channel_count or 1):
+            await self.rtsp_camera_instance.unregister_decode_jpg_async(channel=channel)
+            await self.rtsp_camera_instance.unregister_raw_video_async(channel=channel)
+            self.camera_img_queues[channel].clear()
+
+        await self.rtsp_camera_instance.destroy_async()
