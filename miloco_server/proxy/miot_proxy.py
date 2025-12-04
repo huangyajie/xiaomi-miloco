@@ -72,7 +72,7 @@ class MiotProxy:
                 logger.warning("RTSP library not found, will mark RTSP cameras offline: %s", exc)
             except Exception as exc:  # pylint: disable=broad-exception-caught
                 logger.error("Failed to initialize RTSP camera client: %s", exc, exc_info=True)
-        
+
     @property
     def miot_client(self) -> MIoTClient:
         return self._miot_client

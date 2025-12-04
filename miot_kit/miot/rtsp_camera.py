@@ -414,7 +414,10 @@ class RTSPCameraInstance:
         self._camera_info.online = False
         s_callbacks = self._callbacks.get("status", {})
         for callback in s_callbacks.values():
-            asyncio.run_coroutine_threadsafe(callback(self._camera_info.did, MIoTCameraStatus.DISCONNECTED), self._main_loop)
+            asyncio.run_coroutine_threadsafe(
+                callback(self._camera_info.did, MIoTCameraStatus.DISCONNECTED),
+                self._main_loop,
+            )
 
         if self._enable_reconnect:
             self._reconnect_timer = self._main_loop.call_later(
@@ -494,7 +497,13 @@ class RTSPCameraInstance:
             v_callbacks = self._callbacks.get(f"raw_video.{channel}", {})
             for v_callback in list(v_callbacks.values()):
                 asyncio.run_coroutine_threadsafe(
-                    v_callback(self._camera_info.did, frame_data.data, frame_data.timestamp, frame_data.sequence, channel),
+                    v_callback(
+                        self._camera_info.did,
+                        frame_data.data,
+                        frame_data.timestamp,
+                        frame_data.sequence,
+                        channel,
+                    ),
                     self._main_loop,
                 )
         elif codec_id in [MIoTCameraCodec.AUDIO_OPUS, MIoTCameraCodec.AUDIO_G711A, MIoTCameraCodec.AUDIO_G711U]:
@@ -503,7 +512,13 @@ class RTSPCameraInstance:
             a_callbacks = self._callbacks.get(f"raw_audio.{channel}", {})
             for a_callback in list(a_callbacks.values()):
                 asyncio.run_coroutine_threadsafe(
-                    a_callback(self._camera_info.did, frame_data.data, frame_data.timestamp, frame_data.sequence, channel),
+                    a_callback(
+                        self._camera_info.did,
+                        frame_data.data,
+                        frame_data.timestamp,
+                        frame_data.sequence,
+                        channel,
+                    ),
                     self._main_loop,
                 )
         else:
