@@ -106,6 +106,9 @@ CAMERA_CONFIG = {
     ),
 }
 
+# RTSP camera configuration
+RTSP_CAMERA_CONFIG = _config.get("rtsp_cameras", [])
+
 # MIoT dynamic configuration
 MIOT_CONFIG = {
     "cloud_server": _config["miot"]["cloud_server"],
