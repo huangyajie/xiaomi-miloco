@@ -60,19 +60,11 @@ camera:
 
 rtsp_cameras:
   # Example RTSP camera configuration. Remove or duplicate entries as needed.
-  - did: "rtsp_cam_1"
-    name: "X500"
+  - did: "ip_camera_1"
+    name: "ip_camera_1"
     rtsp_url: "rtsp://192.168.22.148:8554/live/0"
     enable_audio: false
     transport: "udp"  # tcp/udp, defaults to udp
-    home_name: "家"
-    room_name: "客厅"
-
-  - did: "rtsp_cam_2"
-    name: "X600"
-    rtsp_url: "rtsp://192.168.22.148:8554/live/1"
-    enable_audio: false
-    transport: "tcp"
     home_name: "家"
     room_name: "客厅"
 
