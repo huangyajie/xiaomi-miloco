@@ -9,6 +9,7 @@ import logging
 from typing import List, Optional
 
 from miot.types import MIoTUserInfo, MIoTCameraInfo, MIoTDeviceInfo, MIoTManualSceneInfo
+from miot.rtsp_camera import RtspCameraInfo
 
 from miloco_server.proxy.miot_proxy import MiotProxy
 from miloco_server.schema.trigger_schema import Action
@@ -89,7 +90,8 @@ class MiotService:
         """
         try:
             result = await self._miot_proxy.refresh_scenes()
-            if not result:
+            # None means call failed; an empty dict just means no scenes available and should not be treated as an error
+            if result is None:
                 raise MiotServiceException("Failed to refresh MiOT scenes")
             return True
         except Exception as e:
@@ -178,7 +180,7 @@ class MiotService:
         try:
             camera_dict: dict[
                 str,
-                MIoTCameraInfo] | None = await self._miot_proxy.get_cameras()
+                MIoTCameraInfo | RtspCameraInfo] = await self._miot_proxy.get_cameras()
             if not camera_dict:
                 raise MiotServiceException("Failed to get MiOT camera list")
 
@@ -216,11 +218,11 @@ class MiotService:
         logger.info(
             "get_miot_cameras_img, camera_dids: %s", ", ".join(camera_dids))
         try:
-            all_camera_info: dict[str, MIoTCameraInfo] = await self._miot_proxy.get_cameras()
+            all_camera_info: dict[str, MIoTCameraInfo | RtspCameraInfo] = await self._miot_proxy.get_cameras()
             if not all_camera_info:
                 return []
 
-            selected_camera_info: list[MIoTCameraInfo] = [
+            selected_camera_info: list[MIoTCameraInfo | RtspCameraInfo] = [
                 info for info in all_camera_info.values() if (info.did in camera_dids)
             ]
 
