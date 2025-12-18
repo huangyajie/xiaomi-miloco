@@ -134,7 +134,6 @@ const DeviceItem = ({ item, onPlay, playing }) => {
           <VideoPlayer
             cameraId={item.did}
             channel={channel}
-            codec={'hev1.1.6.L93.B0'}
             poster={item.cover}
             onCanvasRef={handleCanvasRef}
             // onReady={handleVideoReady}

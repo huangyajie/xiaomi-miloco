@@ -38,6 +38,7 @@ export default defineConfig(({ command }) => {
       extensions: [".mjs", ".js", ".ts", ".jsx", ".tsx", ".json", ".vue"],
     },
     build: {
+      outDir: '../miloco_server/static',
       assetsDir: 'assets',
       rollupOptions: {
         output: {
@@ -72,7 +73,7 @@ export default defineConfig(({ command }) => {
       }),
       proxy: {
         '/api': {
-          target: config.api.target,
+          target: "https://192.168.8.100:8000",
           changeOrigin: true,
           ws: true,
           secure: false,
