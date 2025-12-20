@@ -353,6 +353,9 @@ export default {
     fetchDeviceListFailed: '获取设备列表失败',
     refreshDeviceListFailed: '刷新设备列表失败',
     noDevice: '暂无设备',
+    miotDevices: '米家设备',
+    haDevices: 'HA设备',
+    defaultRoom: '未分配区域',
   },
   logManage: {
     triggerRules: '触发规则',

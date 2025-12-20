@@ -261,3 +261,28 @@ class HAHttpClient:
             service="trigger",
             entity_id=automation if isinstance(automation, str) else automation.entity_id
         )
+
+    async def render_template_async(self, template_str: str, timeout: int = HA_HTTP_API_TIMEOUT) -> str:
+        """Render a Home Assistant template."""
+        if not template_str:
+            raise ValueError("invalid template")
+        http_res = await self._session.post(
+            url=f"{self._base_url}/api/template",
+            json={"template": template_str},
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self._token}"
+            },
+            timeout=aiohttp.ClientTimeout(total=timeout)
+        )
+
+        if http_res.status == 401:
+            raise TypeError("ha api get failed, unauthorized(401)")
+        if http_res.status not in [200, 201]:
+            raise TypeError(f"ha api template failed, {http_res.status}")
+
+        return await http_res.text()
+
+    async def get_config_async(self) -> Dict:
+        """Get configuration."""
+        return await self.__api_get_async(url_path="/api/config", params={})

@@ -53,6 +53,8 @@ export const getHAAuth = () => getApi('/api/ha/get_config');
 export const getHaList = () => getApi('/api/ha/automations');
 export const getHaAutomationActions = () => getApi('/api/ha/automation_actions');
 export const refreshHaAutomation = () => getApi('/api/ha/refresh_ha_automations');
+export const getHADeviceList = () => getApi('/api/ha/devices');
+export const controlHADevice = (data) => postApi('/api/ha/control', data);
 
 // mcp
 export const getMCPService = () => getApi('/api/mcp');

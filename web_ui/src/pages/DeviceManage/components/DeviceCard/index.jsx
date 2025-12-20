@@ -4,6 +4,7 @@
  */
 
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, Icon } from '@/components';
 import styles from './index.module.less';
 
@@ -15,7 +16,10 @@ import styles from './index.module.less';
  * @returns {JSX.Element} Device card component
  */
 const DeviceCard = ({ device }) => {
+  const { t } = useTranslation();
   const { name, icon, room_name, home_name, online } = device;
+  const displayRoomName = room_name || t('deviceManage.defaultRoom');
+
   const StatusView = ({device}) => {
     const {  is_set_pincode } = device;
     if(is_set_pincode > 0){
@@ -28,21 +32,21 @@ const DeviceCard = ({ device }) => {
   return (
     <Card className={`${styles.deviceCard} ${!online ? styles.offline : ''}`} contentClassName={styles.deviceCardContent}>
       <div className={styles.deviceIcon}>
-        {icon ? (
+        {icon && (icon.startsWith('http') || icon.startsWith('/') || icon.startsWith('data:')) ? (
           <img src={icon} alt={name} className={styles.deviceImage} />
         ) : (
-          <div className={styles.defaultIcon}>{icon}</div>
+          <div className={styles.defaultIcon}>
+            <Icon name={icon || 'menuDevice'} size={24} />
+          </div>
         )}
 
       </div>
-      <div className={styles.deviceInfo}>
-        <div className={styles.deviceName}>{name}</div>
-        <div className={styles.deviceDetails}>
-          {`${home_name} ${home_name ? '|' : ''} ${room_name}`}
-
-        </div>
-      </div>
-      <StatusView device={device} />
+            <div className={styles.deviceInfo}>
+              <div className={styles.deviceName}>{name}</div>
+              <div className={styles.deviceDetails}>
+                {home_name ? `${home_name} | ${displayRoomName}` : displayRoomName}
+              </div>
+            </div>      <StatusView device={device} />
     </Card>
   );
 };

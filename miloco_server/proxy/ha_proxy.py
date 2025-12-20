@@ -8,7 +8,8 @@ import logging
 from typing import Optional
 
 from pydantic_core import to_jsonable_python
-from miot.ha_api import HAAutomationInfo, HAHttpClient
+from miot.types import HAAutomationInfo, HAStateInfo
+from miot.ha_api import HAHttpClient
 
 from miloco_server.dao.kv_dao import AuthConfigKeys, KVDao, DeviceInfoKeys
 from miloco_server.schema.miot_schema import HAConfig
@@ -108,4 +109,55 @@ class HAProxy:
                 return None
         else:
             logger.warning("Miot ha rest api is not initialized")
+            return None
+
+    async def get_states(self) -> dict[str, HAStateInfo] | None:
+        """Get all states from Home Assistant"""
+        if not self._ha_rest_api:
+            logger.warning("Miot ha rest api is not initialized")
+            return None
+        try:
+            return await self._ha_rest_api.get_states_async()
+        except Exception as e:  # pylint: disable=broad-except
+            logger.warning("Failed to get states: %s", e)
+            return None
+
+    async def call_service(self, domain: str, service: str, entity_id: str) -> bool:
+        """Call a service in Home Assistant"""
+        if not self._ha_rest_api:
+            logger.warning("Miot ha rest api is not initialized")
+            return False
+        try:
+            return await self._ha_rest_api.call_service(domain, service, entity_id)
+        except Exception as e:  # pylint: disable=broad-except
+            logger.warning("Failed to call service: %s", e)
+            return False
+
+    async def get_all_areas(self) -> dict[str, str] | None:
+        """Get area name for all entities"""
+        if not self._ha_rest_api:
+            return None
+        template = """
+        {
+          {% for state in states %}
+            "{{ state.entity_id }}": "{{ area_name(state.entity_id) or '' }}"{% if not loop.last %},{% endif %}
+          {% endfor %}
+        }
+        """
+        try:
+            res = await self._ha_rest_api.render_template_async(template)
+            return json.loads(res)
+        except Exception as e:  # pylint: disable=broad-except
+            logger.warning("Failed to get areas: %s", e)
+            return None
+
+    async def get_location_name(self) -> str | None:
+        """Get Home Assistant location name"""
+        if not self._ha_rest_api:
+            return None
+        try:
+            config = await self._ha_rest_api.get_config_async()
+            return config.get("location_name")
+        except Exception as e:  # pylint: disable=broad-except
+            logger.warning("Failed to get location name: %s", e)
             return None
