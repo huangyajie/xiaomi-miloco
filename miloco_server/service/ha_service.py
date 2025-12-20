@@ -64,13 +64,6 @@ class HaService:
         "mdi:weather-partly-cloudy": "cloud",
     }
 
-    # Mapping from HA device_class to internal icon name
-    _HA_DEVICE_CLASS_MAPPING = {
-        "lock": "lock",
-        "motion": "menuDevice", # Could use a motion icon if available
-        "door": "menuDevice",   # Could use a door icon if available
-    }
-
     def __init__(
         self,
         ha_proxy: HAProxy,
@@ -224,7 +217,7 @@ class HaService:
     def _get_icon_for_ha_device(self, state_info: HAStateInfo, base_url: str) -> str:
         """
         Determine the icon for HA device.
-        Prioritizes entity_picture, then specific mappings, then device class, then domain-based mappings.
+        Prioritizes entity_picture, then specific mappings, then domain-based mappings.
         """
         # 1. Check for entity_picture
         entity_picture = state_info.attributes.get("entity_picture")
@@ -244,21 +237,10 @@ class HaService:
             if ha_icon.startswith("http") or ha_icon.startswith("/"):
                 return ha_icon
 
-        # 3. Check device_class mapping
-        device_class = state_info.attributes.get("device_class")
-        if device_class:
-            # Try domain.device_class first (e.g. binary_sensor.lock)
-            key = f"{state_info.domain}.{device_class}"
-            if key in self._HA_DEVICE_CLASS_MAPPING:
-                return self._HA_DEVICE_CLASS_MAPPING[key]
-            # Try just device_class
-            if device_class in self._HA_DEVICE_CLASS_MAPPING:
-                return self._HA_DEVICE_CLASS_MAPPING[device_class]
-
-        # 4. Derive from domain
+        # 3. Derive from domain
         if state_info.domain in self._HA_DOMAIN_TO_INTERNAL_ICON:
             return self._HA_DOMAIN_TO_INTERNAL_ICON[state_info.domain]
-        # 5. Default generic icon
+        # 4. Default generic icon
         return "menuDevice"
 
     async def get_ha_device_list(self) -> List[HADeviceInfo]:
