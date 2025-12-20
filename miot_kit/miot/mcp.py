@@ -963,6 +963,16 @@ class McpHADeviceInfo(BaseModel):
     domain: str = Field(description="Device domain")
 
 
+class McpHADeviceSpecLite(BaseModel):
+    """Home Assistant device spec lite."""
+    iid: str = Field(description="Entity ID")
+    description: str = Field(description="Service name")
+    format: str = Field(description="Service domain")
+    writeable: bool = Field(description="Writeable")
+    readable: bool = Field(description="Readable")
+    unit: Optional[str] = Field(default=None, description="Unit")
+
+
 class HomeAssistantDeviceMcpInterface(_BaseMcpInterface):
     """Home Assistant device MCP Interface."""
     # pylint: disable=pointless-string-statement
@@ -987,8 +997,12 @@ class HomeAssistantDeviceMcp(_BaseMcp[HomeAssistantDeviceMcpInterface]):
     """Home Assistant Device MCP server."""
     _MCP_PATH: str = "/mcp"
     _MCP_TAG: str = "ha_devices"
+    _TOOL_NAME_GET_AREA_INFO: str = "get_area_info"
+    _TOOL_NAME_GET_DEVICE_CLASSES: str = "get_device_classes"
     _TOOL_NAME_GET_DEVICES: str = "get_devices"
-    _TOOL_NAME_CONTROL_DEVICE: str = "send_control_command"
+    _TOOL_NAME_GET_DEVICE_SPEC: str = "get_device_spec"
+    _TOOL_NAME_SEND_CTRL_RPC: str = "send_ctrl_rpc"
+    _TOOL_NAME_SEND_GET_RPC: str = "send_get_rpc"
     _mcp: FastMCP
 
     def __init__(
@@ -1003,24 +1017,99 @@ class HomeAssistantDeviceMcp(_BaseMcp[HomeAssistantDeviceMcpInterface]):
     async def init_async(self) -> None:
         """Init."""
         await super().init_async()
+        # get area info.
+        self.add_tool(
+            fn=self.get_area_info_async,
+            name=self._TOOL_NAME_GET_AREA_INFO,
+            description_default="Get Home Assistant area list."
+        )
+        # get device classes.
+        self.add_tool(
+            fn=self.get_device_classes_async,
+            name=self._TOOL_NAME_GET_DEVICE_CLASSES,
+            description_default="Get supported Home Assistant device class list."
+        )
         # get devices.
         self.add_tool(
             fn=self.get_devices_async,
             name=self._TOOL_NAME_GET_DEVICES,
             description_default="Get Home Assistant device list."
         )
-        # control device.
+        # get device spec.
         self.add_tool(
-            fn=self.send_control_command_async,
-            name=self._TOOL_NAME_CONTROL_DEVICE,
-            description_default="Control a Home Assistant device."
+            fn=self.get_device_spec_async,
+            name=self._TOOL_NAME_GET_DEVICE_SPEC,
+            description_default="Get Home Assistant device SPEC definition."
         )
+        # send ctrl rpc.
+        self.add_tool(
+            fn=self.send_ctrl_rpc_async,
+            name=self._TOOL_NAME_SEND_CTRL_RPC,
+            description_default="Control a Home Assistant device, support domain and service.",
+            replace_default={
+                "tool_name_get_devices": self._TOOL_NAME_GET_DEVICES,
+                "tool_name_get_device_spec": self._TOOL_NAME_GET_DEVICE_SPEC,
+                "tool_name_send_ctrl_rpc": self._TOOL_NAME_SEND_CTRL_RPC
+            }
+        )
+        # send get rpc.
+        self.add_tool(
+            fn=self.send_get_rpc_async,
+            name=self._TOOL_NAME_SEND_GET_RPC,
+            description_default="Get a Home Assistant device status.",
+            replace_default={
+                "tool_name_get_devices": self._TOOL_NAME_GET_DEVICES,
+                "tool_name_get_device_spec": self._TOOL_NAME_GET_DEVICE_SPEC,
+                "tool_name_send_get_rpc": self._TOOL_NAME_SEND_GET_RPC
+            }
+        )
+
+    async def get_area_info_async(self) -> Dict[str, Any]:
+        """Get the area list."""
+        # For HA, areas are part of device attributes, so we extract unique areas
+        devices = await self._interface.get_devices_async()
+        areas = {}
+        for device in devices:
+            if device.area and device.area.strip():
+                # Create area info to match miot format
+                areas[device.area] = {
+                    "area_id": device.area,
+                    "area_name": device.area
+                }
+        return areas
+
+    async def get_device_classes_async(self) -> Dict[str, str]:
+        """Get the device class list."""
+        devices = await self._interface.get_devices_async()
+        domains = {}
+        for device in devices:
+            if device.domain and device.domain.strip():
+                domains[device.domain] = device.domain
+        return domains
 
     async def get_devices_async(self) -> List[McpHADeviceInfo]:
         """Get the device list."""
         return await self._interface.get_devices_async()
 
-    async def send_control_command_async(
+    async def get_device_spec_async(self, entity_id: str) -> Dict[str, Any]:
+        """Get device spec definition."""
+        # For HA, we return device services as "spec"
+        devices = await self._interface.get_devices_async()
+        for device in devices:
+            if device.entity_id == entity_id:
+                # Create a basic spec with control service info
+                spec = {
+                    "iid": device.entity_id,
+                    "description": device.name,
+                    "format": device.domain,
+                    "writeable": True,  # HA devices are generally controllable
+                    "readable": True,   # HA devices can report state
+                    "unit": None
+                }
+                return {device.entity_id: spec}
+        return {}
+
+    async def send_ctrl_rpc_async(
         self,
         entity_id: Annotated[str, "Entity ID"],
         domain: Annotated[str, "Service Domain (e.g. light, switch)"],
@@ -1031,3 +1120,17 @@ class HomeAssistantDeviceMcp(_BaseMcp[HomeAssistantDeviceMcpInterface]):
         if service_data is None:
             service_data = {}
         return await self._interface.control_device_async(entity_id, domain, service, service_data)
+
+    async def send_get_rpc_async(
+        self,
+        entity_id: Annotated[str, "Entity ID"]
+    ) -> Dict[str, Any]:
+        """Get device status."""
+        devices = await self._interface.get_devices_async()
+        for device in devices:
+            if device.entity_id == entity_id:
+                return {
+                    "entity_id": device.entity_id,
+                    "state": device.state
+                }
+        return {}
