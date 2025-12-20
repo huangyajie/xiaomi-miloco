@@ -126,6 +126,9 @@ class HaService:
                 logger.warning("Failed to get Home Assistant device list")
                 return []
             
+            areas = await self._ha_proxy.get_all_areas() or {}
+            location_name = await self._ha_proxy.get_location_name() or ""
+            
             device_list = []
             for entity_id, state_info in states.items():
                 is_online = state_info.state not in ["unavailable", "unknown"]
@@ -133,12 +136,12 @@ class HaService:
                 
                 device_info = HADeviceInfo(
                     did=entity_id,
-                    name=state_info.friendly_name or entity_id,
+                    name=state_info.attributes.get("friendly_name") or entity_id,
                     online=is_online,
                     model=state_info.domain,
-                    icon=None, # TODO: Map domain to icon if needed
-                    home_name="Home Assistant",
-                    room_name="",
+                    icon=state_info.attributes.get("icon"), 
+                    home_name=location_name,
+                    room_name=areas.get(entity_id, ""),
                     entity_id=entity_id,
                     state=state_info.state,
                     attributes=state_info.attributes,

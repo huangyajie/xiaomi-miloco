@@ -132,3 +132,33 @@ class HAProxy:
         except Exception as e:
             logger.warning("Failed to call service: %s", e)
             return False
+
+    async def get_all_areas(self) -> dict[str, str] | None:
+        """Get area name for all entities"""
+        if not self._ha_rest_api:
+            return None
+        
+        template = """
+        {
+          {% for state in states %}
+            "{{ state.entity_id }}": "{{ area_name(state.entity_id) or '' }}"{% if not loop.last %},{% endif %}
+          {% endfor %}
+        }
+        """
+        try:
+            res = await self._ha_rest_api.render_template_async(template)
+            return json.loads(res)
+        except Exception as e:
+            logger.warning("Failed to get areas: %s", e)
+            return None
+
+    async def get_location_name(self) -> str | None:
+        """Get Home Assistant location name"""
+        if not self._ha_rest_api:
+            return None
+        try:
+            config = await self._ha_rest_api.get_config_async()
+            return config.get("location_name")
+        except Exception as e:
+            logger.warning("Failed to get location name: %s", e)
+            return None
