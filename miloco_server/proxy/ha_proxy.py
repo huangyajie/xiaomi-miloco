@@ -118,7 +118,7 @@ class HAProxy:
             return None
         try:
             return await self._ha_rest_api.get_states_async()
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             logger.warning("Failed to get states: %s", e)
             return None
 
@@ -129,7 +129,7 @@ class HAProxy:
             return False
         try:
             return await self._ha_rest_api.call_service(domain, service, entity_id)
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             logger.warning("Failed to call service: %s", e)
             return False
 
@@ -137,7 +137,6 @@ class HAProxy:
         """Get area name for all entities"""
         if not self._ha_rest_api:
             return None
-        
         template = """
         {
           {% for state in states %}
@@ -148,7 +147,7 @@ class HAProxy:
         try:
             res = await self._ha_rest_api.render_template_async(template)
             return json.loads(res)
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             logger.warning("Failed to get areas: %s", e)
             return None
 
@@ -159,6 +158,6 @@ class HAProxy:
         try:
             config = await self._ha_rest_api.get_config_async()
             return config.get("location_name")
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             logger.warning("Failed to get location name: %s", e)
             return None

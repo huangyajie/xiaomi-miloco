@@ -266,7 +266,6 @@ class HAHttpClient:
         """Render a Home Assistant template."""
         if not template_str:
             raise ValueError("invalid template")
-        
         http_res = await self._session.post(
             url=f"{self._base_url}/api/template",
             json={"template": template_str},
@@ -276,12 +275,12 @@ class HAHttpClient:
             },
             timeout=aiohttp.ClientTimeout(total=timeout)
         )
-        
+
         if http_res.status == 401:
             raise TypeError("ha api get failed, unauthorized(401)")
         if http_res.status not in [200, 201]:
             raise TypeError(f"ha api template failed, {http_res.status}")
-            
+
         return await http_res.text()
 
     async def get_config_async(self) -> Dict:

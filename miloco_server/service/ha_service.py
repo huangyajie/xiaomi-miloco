@@ -18,7 +18,14 @@ from miloco_server.proxy.ha_proxy import HAProxy
 from miloco_server.schema.miot_schema import HAConfig, HADeviceInfo, HAControlRequest
 from miloco_server.schema.trigger_schema import Action
 from miloco_server.utils.default_action import DefaultPresetActionManager
+from miloco_server.mcp.mcp_client import LocalMCPConfig, TransportType
+from miloco_server.schema.mcp_schema import LocalMcpClientId
 
+from miot.mcp import (
+    HomeAssistantDeviceMcp,
+    HomeAssistantDeviceMcpInterface,
+    McpHADeviceInfo
+)
 from miot.types import HAAutomationInfo, HAStateInfo
 
 logger = logging.getLogger(__name__)
@@ -85,14 +92,6 @@ class HaService:
             return
 
         try:
-            from miot.mcp import (
-                HomeAssistantDeviceMcp,
-                HomeAssistantDeviceMcpInterface,
-                McpHADeviceInfo
-            )
-            from miloco_server.mcp.mcp_client import LocalMCPConfig, TransportType
-            from miloco_server.schema.mcp_schema import LocalMcpClientId
-
             # Create HA device MCP client
             async def _get_devices() -> List[McpHADeviceInfo]:
                 devices = await self.get_ha_device_list()
@@ -106,9 +105,10 @@ class HaService:
                     ) for d in devices
                 ]
 
-            async def _control_device(entity_id: str, domain: str, service: str, service_data: Optional[Dict[str, Any]] = None) -> bool:
+            async def _control_device(
+                entity_id: str, domain: str, service: str, service_data: Optional[Dict[str, Any]] = None
+            ) -> bool:
                 try:
-                    from miloco_server.schema.miot_schema import HAControlRequest
                     await self.control_ha_device(HAControlRequest(
                         entity_id=entity_id,
                         domain=domain,
@@ -149,7 +149,7 @@ class HaService:
         """
         try:
             await self._ha_proxy.refresh_ha_automations()
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             logger.error("Failed to refresh Home Assistant automations: %s", e)
             raise HaServiceException(f"Failed to refresh Home Assistant automations: {str(e)}") from e
 
@@ -170,7 +170,7 @@ class HaService:
 
         except ValidationException:
             raise
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             logger.error("Exception occurred while saving Home Assistant configuration: %s", e)
             raise BusinessException(f"Failed to save Home Assistant configuration: {str(e)}") from e
 
@@ -180,7 +180,7 @@ class HaService:
             if not ha_config:
                 logger.warning("Home Assistant configuration not set")
             return ha_config
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             logger.error("Exception occurred while getting Home Assistant configuration: %s", e)
             raise HaServiceException(f"Failed to get Home Assistant configuration: {str(e)}") from e
 
@@ -194,7 +194,7 @@ class HaService:
                 "Successfully retrieved Home Assistant automation list - count: %d", len(automations.values()))
             return list(automations.values())
 
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             logger.error("Failed to get Home Assistant automation list: %s", e)
             raise HaServiceException(
                 f"Failed to get Home Assistant automation list: {str(e)}") from e
@@ -217,7 +217,7 @@ class HaService:
             actions = await self._default_preset_action_manager.get_ha_automation_actions()
 
             return list(actions.values())
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             logger.error("Failed to get Home Assistant automation action list: %s", e)
             raise HaServiceException(f"Failed to get Home Assistant automation action list: {str(e)}") from e
 
@@ -232,6 +232,7 @@ class HaService:
             if entity_picture.startswith("http"):
                 return entity_picture
             # Ensure base_url doesn't end with slash and entity_picture starts with slash
+            # pylint: disable=inconsistent-quotes
             return f"{base_url.rstrip('/')}/{entity_picture.lstrip('/')}"
 
         # 2. Check specific MDI icon in attributes and map it
@@ -257,7 +258,6 @@ class HaService:
         # 4. Derive from domain
         if state_info.domain in self._HA_DOMAIN_TO_INTERNAL_ICON:
             return self._HA_DOMAIN_TO_INTERNAL_ICON[state_info.domain]
-        
         # 5. Default generic icon
         return "menuDevice"
 
@@ -268,24 +268,23 @@ class HaService:
             if states is None:
                 logger.warning("Failed to get Home Assistant device list")
                 return []
-            
             areas = await self._ha_proxy.get_all_areas() or {}
             location_name = await self._ha_proxy.get_location_name() or ""
             ha_config = self._ha_proxy.get_ha_config()
             base_url = ha_config.base_url if ha_config else ""
-            
+
             device_list = []
 
             for entity_id, state_info in states.items():
                 is_online = state_info.state not in ["unavailable", "unknown"]
                 supported_features = state_info.attributes.get("supported_features", 0)
-                
+
                 device_info = HADeviceInfo(
                     did=entity_id,
                     name=state_info.attributes.get("friendly_name") or entity_id,
                     online=is_online,
                     model=state_info.domain,
-                    icon=self._get_icon_for_ha_device(state_info, base_url), 
+                    icon=self._get_icon_for_ha_device(state_info, base_url),
                     home_name=location_name,
                     room_name=areas.get(entity_id, ""),
                     entity_id=entity_id,
@@ -294,10 +293,10 @@ class HaService:
                     supported_features=supported_features
                 )
                 device_list.append(device_info)
-            
+
             logger.info("Successfully retrieved Home Assistant device list - count: %d", len(device_list))
             return device_list
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             logger.error("Failed to get Home Assistant device list: %s", e)
             raise HaServiceException(f"Failed to get Home Assistant device list: {str(e)}") from e
 
@@ -312,6 +311,6 @@ class HaService:
             if not result:
                 raise HaServiceException("Failed to control Home Assistant device")
             logger.info("Successfully controlled Home Assistant device: %s", control_req.entity_id)
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             logger.error("Failed to control Home Assistant device: %s", e)
             raise HaServiceException(f"Failed to control Home Assistant device: {str(e)}") from e

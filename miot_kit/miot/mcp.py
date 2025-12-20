@@ -698,7 +698,7 @@ class MIoTDeviceMcp(_BaseMcp[MIoTDeviceMcpInterface]):
                 if value_trans is None:
                     _LOGGER.warning("invalid property value(%s), %s, %s, %s", spec.format, did, iid, value)
                     # TODO: translate
-                    raise ToolError(f"Invalid property value format")
+                    raise ToolError("Invalid property value format")
             result = await self._interface.set_prop_async(
                 MIoTSetPropertyParam(
                     did=did,
@@ -988,7 +988,9 @@ class HomeAssistantDeviceMcpInterface(_BaseMcpInterface):
 
     """
     example:
-        async def control_device_async(entity_id: str, domain: str, service: str, service_data: Optional[Dict[str, Any]]) -> bool:
+        async def control_device_async(
+            entity_id: str, domain: str, service: str, service_data: Optional[Dict[str, Any]]
+        ) -> bool:
             pass
     """
 

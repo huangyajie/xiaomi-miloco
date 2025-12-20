@@ -6,8 +6,7 @@
 import React, { useRef, useEffect, useCallback } from 'react'
 import { message } from 'antd'
 import ReactMarkdown from 'react-markdown'
-import { useTranslation } from 'react-i18next';
-import { useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next'
 import { useChatStore, useSessionChatStore } from '@/stores/chatStore';
 import { useGlobalSocket } from '@/hooks/useGlobalSocket';
 import { useAutoScroll } from '@/hooks/useAutoScroll';
@@ -120,7 +119,7 @@ const ChatDialog = () => {
       const { setIsAnswering } = useChatStore.getState();
       setIsAnswering(false);
     }
-  }, [globalSendMessage, socketActions]);
+  }, [globalSendMessage, socketActions, t]);
 
 
   useEffect(() => {
@@ -130,7 +129,7 @@ const ChatDialog = () => {
         socketActions.saveStateBeforeLeave();
       }
     };
-  }, [messages.length, isAnswering]);
+  }, [messages.length, isAnswering, socketActions]);
 
   return (
     <div className={styles.chatDialogWrap}>
