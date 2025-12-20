@@ -97,7 +97,7 @@ const ChatDialog = () => {
     // use global send message method, handle all common logic
     const messageData = await globalSendMessage(
       content,
-      ['miot_manual_scenes', 'miot_devices', 'ha_automations'], // default MCP list for welcome message
+      ['miot_manual_scenes', 'miot_devices', 'ha_automations', 'ha_devices'], // default MCP list for welcome message
       {
         onBeforeSend: () => {
 

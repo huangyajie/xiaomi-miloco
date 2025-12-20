@@ -6,7 +6,7 @@ Home Assistant service module
 """
 
 import logging
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 from miloco_server.mcp.mcp_client_manager import MCPClientManager
 from miloco_server.middleware.exceptions import (
@@ -79,6 +79,70 @@ class HaService:
         """Get the HAHttpClient instance."""
         return self._ha_proxy.ha_client
 
+    async def initialize_ha_devices_mcp(self):
+        """Initialize HA devices MCP client if HA is configured"""
+        if not self.ha_client:
+            return
+
+        try:
+            from miot.mcp import (
+                HomeAssistantDeviceMcp,
+                HomeAssistantDeviceMcpInterface,
+                McpHADeviceInfo
+            )
+            from miloco_server.mcp.mcp_client import LocalMCPConfig, TransportType
+            from miloco_server.schema.mcp_schema import LocalMcpClientId
+
+            # Create HA device MCP client
+            async def _get_devices() -> List[McpHADeviceInfo]:
+                devices = await self.get_ha_device_list()
+                return [
+                    McpHADeviceInfo(
+                        entity_id=d.entity_id,
+                        name=d.name,
+                        state=d.state,
+                        area=d.room_name,
+                        domain=d.model # domain is stored in model
+                    ) for d in devices
+                ]
+
+            async def _control_device(entity_id: str, domain: str, service: str, service_data: Optional[Dict[str, Any]] = None) -> bool:
+                try:
+                    from miloco_server.schema.miot_schema import HAControlRequest
+                    await self.control_ha_device(HAControlRequest(
+                        entity_id=entity_id,
+                        domain=domain,
+                        service=service,
+                        service_data=service_data
+                    ))
+                    return True
+                except Exception:  # pylint: disable=broad-except
+                    return False
+
+            ha_devices_mcp = HomeAssistantDeviceMcp(
+                interface=HomeAssistantDeviceMcpInterface(
+                    translate_async=self._mcp_client_manager.miot_proxy.miot_client.i18n.translate_async,
+                    get_devices_async=_get_devices,
+                    control_device_async=_control_device
+                )
+            )
+            await ha_devices_mcp.init_async()
+
+            # Register the client with MCPClientManager
+            await self._mcp_client_manager.add_client(
+                transport_type=TransportType.LOCAL,
+                config=LocalMCPConfig(
+                    client_id=LocalMcpClientId.HA_DEVICES,
+                    server_name="Home Assistant设备控制 (Home Assistant Device Control)",
+                    mcp_server=ha_devices_mcp.mcp_instance
+                )
+            )
+
+            logger.info("Successfully initialized Home Assistant Device MCP client")
+
+        except Exception as e:  # pylint: disable=broad-except
+            logger.error("Failed to initialize HA devices MCP: %s", e)
+
     async def refresh_ha_automations(self):
         """
         Refresh Home Assistant automation information
@@ -100,6 +164,7 @@ class HaService:
                                                     ha_config.token.strip())
 
             await self._mcp_client_manager.init_ha_automations()
+            await self._mcp_client_manager.init_ha_devices()
             logger.info("Home Assistant configuration saved successfully: base_url=%s", ha_config.base_url)
 
         except ValidationException:

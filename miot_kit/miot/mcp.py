@@ -952,3 +952,82 @@ class HomeAssistantAutomationMcp(_BaseMcp[HomeAssistantAutomationMcpInterface]):
                 )
             ))
         return await self._interface.trigger_automation_async(automation_id)
+
+
+class McpHADeviceInfo(BaseModel):
+    """Home Assistant device info for MCP."""
+    entity_id: str = Field(description="Device ID (Entity ID)")
+    name: str = Field(description="Device name")
+    state: str = Field(description="Device state")
+    area: str = Field(description="Device area")
+    domain: str = Field(description="Device domain")
+
+
+class HomeAssistantDeviceMcpInterface(_BaseMcpInterface):
+    """Home Assistant device MCP Interface."""
+    # pylint: disable=pointless-string-statement
+    get_devices_async: Callable[[], Coroutine[Any, Any, List[McpHADeviceInfo]]]
+
+    """
+    example:
+        async def get_devices_async() -> List[McpHADeviceInfo]:
+            pass
+    """
+
+    control_device_async: Callable[[str, str, str, Optional[Dict[str, Any]]], Coroutine[Any, Any, bool]]
+
+    """
+    example:
+        async def control_device_async(entity_id: str, domain: str, service: str, service_data: Optional[Dict[str, Any]]) -> bool:
+            pass
+    """
+
+
+class HomeAssistantDeviceMcp(_BaseMcp[HomeAssistantDeviceMcpInterface]):
+    """Home Assistant Device MCP server."""
+    _MCP_PATH: str = "/mcp"
+    _MCP_TAG: str = "ha_devices"
+    _TOOL_NAME_GET_DEVICES: str = "get_devices"
+    _TOOL_NAME_CONTROL_DEVICE: str = "send_control_command"
+    _mcp: FastMCP
+
+    def __init__(
+        self, interface: HomeAssistantDeviceMcpInterface
+    ) -> None:
+        super().__init__(
+            interface=interface,
+            name="Home Assistant Device MCP Server",
+            instructions="Support querying and controlling Home Assistant devices."
+        )
+
+    async def init_async(self) -> None:
+        """Init."""
+        await super().init_async()
+        # get devices.
+        self.add_tool(
+            fn=self.get_devices_async,
+            name=self._TOOL_NAME_GET_DEVICES,
+            description_default="Get Home Assistant device list."
+        )
+        # control device.
+        self.add_tool(
+            fn=self.send_control_command_async,
+            name=self._TOOL_NAME_CONTROL_DEVICE,
+            description_default="Control a Home Assistant device."
+        )
+
+    async def get_devices_async(self) -> List[McpHADeviceInfo]:
+        """Get the device list."""
+        return await self._interface.get_devices_async()
+
+    async def send_control_command_async(
+        self,
+        entity_id: Annotated[str, "Entity ID"],
+        domain: Annotated[str, "Service Domain (e.g. light, switch)"],
+        service: Annotated[str, "Service Name (e.g. turn_on, turn_off)"],
+        service_data: Annotated[Optional[Dict[str, Any]], "Service Data (JSON)"] = None
+    ) -> bool:
+        """Control device."""
+        if service_data is None:
+            service_data = {}
+        return await self._interface.control_device_async(entity_id, domain, service, service_data)

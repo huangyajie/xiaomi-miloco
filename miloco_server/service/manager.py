@@ -116,6 +116,10 @@ class Manager:
         self._miot_service = MiotService(
             self._miot_proxy, self._mcp_client_manager, self._default_preset_action_manager)
         self._ha_service = HaService(self._ha_proxy, self._mcp_client_manager, self._default_preset_action_manager)
+
+        # Initialize HA devices MCP client
+        await self._ha_service.initialize_ha_devices_mcp()
+
         self._model_service = ModelService(self._kv_dao, self._third_party_model_dao)
         self._mcp_service = McpService(self._mcp_config_dao, self._mcp_client_manager)
         self._chat_service = ChatHistoryService(self._chat_history_dao, self._chat_companion)
