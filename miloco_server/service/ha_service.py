@@ -164,7 +164,8 @@ class HaService:
                                                     ha_config.token.strip())
 
             await self._mcp_client_manager.init_ha_automations()
-            await self._mcp_client_manager.init_ha_devices()
+            # Initialize HA devices MCP client when HA is configured
+            await self.initialize_ha_devices_mcp()
             logger.info("Home Assistant configuration saved successfully: base_url=%s", ha_config.base_url)
 
         except ValidationException:
