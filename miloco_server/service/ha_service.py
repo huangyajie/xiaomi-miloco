@@ -276,6 +276,14 @@ class HaService:
                 )
                 device_list.append(device_info)
 
+            # Sort devices: devices with rooms first, then devices without rooms
+            # Within each group, sort by room name and then device name
+            device_list.sort(key=lambda x: (
+                0 if x.room_name else 1,  # Devices with rooms come first
+                x.room_name or "",        # Sort by room name
+                x.name.lower()            # Then by device name (case-insensitive)
+            ))
+
             logger.info("Successfully retrieved Home Assistant device list - count: %d", len(device_list))
             return device_list
         except Exception as e:  # pylint: disable=broad-except
