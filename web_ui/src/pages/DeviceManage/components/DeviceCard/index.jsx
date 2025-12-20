@@ -32,10 +32,12 @@ const DeviceCard = ({ device }) => {
   return (
     <Card className={`${styles.deviceCard} ${!online ? styles.offline : ''}`} contentClassName={styles.deviceCardContent}>
       <div className={styles.deviceIcon}>
-        {icon ? (
+        {icon && (icon.startsWith('http') || icon.startsWith('/') || icon.startsWith('data:')) ? (
           <img src={icon} alt={name} className={styles.deviceImage} />
         ) : (
-          <div className={styles.defaultIcon}>{icon}</div>
+          <div className={styles.defaultIcon}>
+            <Icon name={icon || 'menuDevice'} size={24} />
+          </div>
         )}
 
       </div>

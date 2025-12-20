@@ -19,13 +19,50 @@ from miloco_server.schema.miot_schema import HAConfig, HADeviceInfo, HAControlRe
 from miloco_server.schema.trigger_schema import Action
 from miloco_server.utils.default_action import DefaultPresetActionManager
 
-from miot.types import HAAutomationInfo
+from miot.types import HAAutomationInfo, HAStateInfo
 
 logger = logging.getLogger(__name__)
 
 
 class HaService:
     """Home Assistant service class"""
+
+    # Mapping from HA domain to internal icon name
+    _HA_DOMAIN_TO_INTERNAL_ICON = {
+        "camera": "instantCameraOpen",
+        "lock": "lock",
+        "weather": "cloud",
+        "media_player": "instantDevicePlay",
+        "automation": "menuSmart",
+        "script": "menuSmart",
+        "scene": "menuSmart",
+        # Fallbacks for common domains to ensures they have a valid internal icon
+        "light": "menuDevice",
+        "switch": "menuDevice",
+        "fan": "menuDevice",
+        "sensor": "menuDevice",
+        "binary_sensor": "menuDevice",
+        "climate": "menuDevice",
+        "cover": "menuDevice",
+        "vacuum": "menuDevice",
+    }
+
+    # Mapping from HA MDI icon string to internal icon name
+    _HA_MDI_TO_INTERNAL_ICON = {
+        "mdi:cctv": "instantCameraOpen",
+        "mdi:camera": "instantCameraOpen",
+        "mdi:lock": "lock",
+        "mdi:lock-open": "lock",
+        "mdi:cloud": "cloud",
+        "mdi:weather-partly-cloudy": "cloud",
+    }
+
+    # Mapping from HA device_class to internal icon name
+    _HA_DEVICE_CLASS_MAPPING = {
+        "lock": "lock",
+        "motion": "menuDevice", # Could use a motion icon if available
+        "door": "menuDevice",   # Could use a door icon if available
+    }
 
     def __init__(
         self,
@@ -118,6 +155,46 @@ class HaService:
             logger.error("Failed to get Home Assistant automation action list: %s", e)
             raise HaServiceException(f"Failed to get Home Assistant automation action list: {str(e)}") from e
 
+    def _get_icon_for_ha_device(self, state_info: HAStateInfo, base_url: str) -> str:
+        """
+        Determine the icon for HA device.
+        Prioritizes entity_picture, then specific mappings, then device class, then domain-based mappings.
+        """
+        # 1. Check for entity_picture
+        entity_picture = state_info.attributes.get("entity_picture")
+        if entity_picture and isinstance(entity_picture, str):
+            if entity_picture.startswith("http"):
+                return entity_picture
+            # Ensure base_url doesn't end with slash and entity_picture starts with slash
+            return f"{base_url.rstrip('/')}/{entity_picture.lstrip('/')}"
+
+        # 2. Check specific MDI icon in attributes and map it
+        ha_icon = state_info.attributes.get("icon")
+        if ha_icon and isinstance(ha_icon, str):
+            if ha_icon in self._HA_MDI_TO_INTERNAL_ICON:
+                return self._HA_MDI_TO_INTERNAL_ICON[ha_icon]
+            # If it's a URL, return it directly
+            if ha_icon.startswith("http") or ha_icon.startswith("/"):
+                return ha_icon
+
+        # 3. Check device_class mapping
+        device_class = state_info.attributes.get("device_class")
+        if device_class:
+            # Try domain.device_class first (e.g. binary_sensor.lock)
+            key = f"{state_info.domain}.{device_class}"
+            if key in self._HA_DEVICE_CLASS_MAPPING:
+                return self._HA_DEVICE_CLASS_MAPPING[key]
+            # Try just device_class
+            if device_class in self._HA_DEVICE_CLASS_MAPPING:
+                return self._HA_DEVICE_CLASS_MAPPING[device_class]
+
+        # 4. Derive from domain
+        if state_info.domain in self._HA_DOMAIN_TO_INTERNAL_ICON:
+            return self._HA_DOMAIN_TO_INTERNAL_ICON[state_info.domain]
+        
+        # 5. Default generic icon
+        return "menuDevice"
+
     async def get_ha_device_list(self) -> List[HADeviceInfo]:
         """Get Home Assistant device list"""
         try:
@@ -128,8 +205,11 @@ class HaService:
             
             areas = await self._ha_proxy.get_all_areas() or {}
             location_name = await self._ha_proxy.get_location_name() or ""
+            ha_config = self._ha_proxy.get_ha_config()
+            base_url = ha_config.base_url if ha_config else ""
             
             device_list = []
+
             for entity_id, state_info in states.items():
                 is_online = state_info.state not in ["unavailable", "unknown"]
                 supported_features = state_info.attributes.get("supported_features", 0)
@@ -139,7 +219,7 @@ class HaService:
                     name=state_info.attributes.get("friendly_name") or entity_id,
                     online=is_online,
                     model=state_info.domain,
-                    icon=state_info.attributes.get("icon"), 
+                    icon=self._get_icon_for_ha_device(state_info, base_url), 
                     home_name=location_name,
                     room_name=areas.get(entity_id, ""),
                     entity_id=entity_id,
