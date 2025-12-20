@@ -13,7 +13,7 @@ from miot.ha_api import HAAutomationInfo
 
 from miloco_server.middleware import verify_token
 from miloco_server.schema.common_schema import NormalResponse
-from miloco_server.schema.miot_schema import HAConfig
+from miloco_server.schema.miot_schema import HAConfig, HADeviceInfo, HAControlRequest
 from miloco_server.service.manager import get_manager
 
 logger = logging.getLogger(name=__name__)
@@ -103,3 +103,32 @@ async def refresh_ha_automations(current_user: str = Depends(verify_token)):
         data=None
     )
 
+
+@router.get(path="/devices", summary="Get Home Assistant device list", response_model=NormalResponse)
+async def get_ha_device_list(current_user: str = Depends(verify_token)):
+    """Get Home Assistant device list"""
+    logger.info("Get HA device list API called, user: %s", current_user)
+
+    devices = await manager.ha_service.get_ha_device_list()
+    
+    logger.info("Successfully retrieved Home Assistant device list - Count: %s", len(devices))
+    return NormalResponse(
+        code=0,
+        message="Home Assistant device list retrieved successfully",
+        data=devices
+    )
+
+
+@router.post(path="/control", summary="Control Home Assistant device", response_model=NormalResponse)
+async def control_ha_device(control_req: HAControlRequest, current_user: str = Depends(verify_token)):
+    """Control Home Assistant device"""
+    logger.info("Control HA device API called, user: %s, entity_id: %s", current_user, control_req.entity_id)
+
+    await manager.ha_service.control_ha_device(control_req)
+
+    logger.info("Successfully controlled Home Assistant device")
+    return NormalResponse(
+        code=0,
+        message="Home Assistant device controlled successfully",
+        data=None
+    )

@@ -351,6 +351,8 @@ export default {
     fetchDeviceListFailed: 'Failed to get device list',
     refreshDeviceListFailed: 'Failed to refresh device list',
     noDevice: 'No devices',
+    miotDevices: 'Xiaomi Home Devices',
+    haDevices: 'HA Devices',
   },
   logManage: {
     triggerRules: 'Trigger Rules',

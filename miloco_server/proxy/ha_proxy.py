@@ -8,7 +8,8 @@ import logging
 from typing import Optional
 
 from pydantic_core import to_jsonable_python
-from miot.ha_api import HAAutomationInfo, HAHttpClient
+from miot.types import HAAutomationInfo, HAStateInfo
+from miot.ha_api import HAHttpClient
 
 from miloco_server.dao.kv_dao import AuthConfigKeys, KVDao, DeviceInfoKeys
 from miloco_server.schema.miot_schema import HAConfig
@@ -109,3 +110,25 @@ class HAProxy:
         else:
             logger.warning("Miot ha rest api is not initialized")
             return None
+
+    async def get_states(self) -> dict[str, HAStateInfo] | None:
+        """Get all states from Home Assistant"""
+        if not self._ha_rest_api:
+            logger.warning("Miot ha rest api is not initialized")
+            return None
+        try:
+            return await self._ha_rest_api.get_states_async()
+        except Exception as e:
+            logger.warning("Failed to get states: %s", e)
+            return None
+
+    async def call_service(self, domain: str, service: str, entity_id: str) -> bool:
+        """Call a service in Home Assistant"""
+        if not self._ha_rest_api:
+            logger.warning("Miot ha rest api is not initialized")
+            return False
+        try:
+            return await self._ha_rest_api.call_service(domain, service, entity_id)
+        except Exception as e:
+            logger.warning("Failed to call service: %s", e)
+            return False

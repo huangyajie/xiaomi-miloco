@@ -3,11 +3,13 @@
  * This software may be used and distributed according to the terms of the Xiaomi Miloco License Agreement.
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Header, Icon, PageContent } from '@/components';
+import { Tabs, Spin, Empty } from 'antd';
+import { Header, Icon } from '@/components';
 import { DeviceList } from './components';
 import { useDevices } from './hooks/useDevices';
+import { useHADevices } from './hooks/useHADevices';
 import styles from './index.module.less';
 
 /**
@@ -18,40 +20,78 @@ import styles from './index.module.less';
  */
 const DeviceManage = () => {
   const { t } = useTranslation();
-  const { devices, loading, refreshDevices } = useDevices();
+  const [activeTab, setActiveTab] = useState('miot');
+  
+  const { devices: miotDevices, loading: miotLoading, refreshDevices: refreshMiot } = useDevices();
+  const { devices: haDevices, loading: haLoading, refreshDevices: refreshHa } = useHADevices();
+
+  const handleRefresh = () => {
+    if (activeTab === 'miot') {
+      refreshMiot();
+    } else {
+      refreshHa();
+    }
+  };
+
+  const renderContent = (devices, loading, emptyText) => {
+      if (loading) {
+          return <div style={{display: 'flex', justifyContent: 'center', padding: '50px 0'}}><Spin /></div>;
+      }
+      if (!devices || devices.length === 0) {
+           return <Empty 
+              description={emptyText} 
+              imageStyle={{ width: 72, height: 72 }}
+            />;
+      }
+      return <DeviceList devices={devices} />;
+  }
+
+  const tabItems = [
+    {
+      key: 'miot',
+      label: t('deviceManage.miotDevices'),
+      children: renderContent(miotDevices, miotLoading, t('deviceManage.noDevice'))
+    },
+    {
+      key: 'ha',
+      label: t('deviceManage.haDevices'),
+      children: renderContent(haDevices, haLoading, t('deviceManage.noDevice'))
+    }
+  ];
 
   return (
-    <PageContent
-      Header={(
-        <Header
-          title={t('home.menu.deviceManage')}
-          rightContent={<div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              cursor: 'pointer'
+    <div className={styles.container}>
+      <div className={styles.wrapper}>
+        <Header title={t('home.menu.deviceManage')} />
+        <div className={styles.tabContainer}>
+          <Tabs
+            activeKey={activeTab}
+            onChange={setActiveTab}
+            items={tabItems}
+            className={styles.tabs}
+            tabBarExtraContent={{
+              right: (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    cursor: 'pointer'
+                  }}
+                  onClick={handleRefresh}
+                >
+                  <Icon
+                    name="refresh"
+                    size={15}
+                    style={{ color: 'var(--text-color)' }}
+                  />
+                  <span style={{ fontSize: '14px', color: 'var(--text-color)', marginLeft: '6px' }}>{t('common.refresh')}</span>
+                </div>
+              )
             }}
-            onClick={refreshDevices}
-          >
-            <Icon
-              name="refresh"
-              size={15}
-              style={{ color: 'var(--text-color)' }}
-            />
-            <span style={{ fontSize: '14px', color: 'var(--text-color)', marginLeft: '6px' }}>{t('common.refresh')}</span>
-          </div>
-          }
-        />
-      )}
-      loading={loading}
-      showEmptyContent={!loading && devices.length === 0}
-      emptyContentProps={{
-        description: t('deviceManage.noDevice'),
-        imageStyle: { width: 72, height: 72 },
-      }}
-    >
-      <DeviceList devices={devices} />
-    </PageContent>
+          />
+        </div>
+      </div>
+    </div>
   );
 };
 

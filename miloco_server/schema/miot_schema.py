@@ -6,7 +6,7 @@ MIoT schema module
 Define MIoT device related data structures
 """
 
-from typing import Optional
+from typing import Optional, Dict, Any
 
 from pydantic import BaseModel, Field
 
@@ -24,6 +24,20 @@ class DeviceInfo(BaseModel):
     room_name: Optional[str] = Field(None, description="Room name")
     is_set_pincode: Optional[int] = Field(0, description="Whether PIN code is set")
     order_time: Optional[int] = Field(None, description="Binding time")
+
+class HADeviceInfo(DeviceInfo):
+    """Home Assistant Device Info"""
+    entity_id: str = Field(..., description="Entity ID")
+    state: str = Field(..., description="Device State")
+    attributes: Dict[str, Any] = Field(default={}, description="Device Attributes")
+    supported_features: Optional[int] = Field(0, description="Supported Features Bitmask")
+
+class HAControlRequest(BaseModel):
+    """Home Assistant Control Request"""
+    entity_id: str = Field(..., description="Entity ID")
+    domain: str = Field(..., description="Service Domain")
+    service: str = Field(..., description="Service Name")
+    service_data: Optional[Dict[str, Any]] = Field(default={}, description="Service Data")
 
 class CameraInfo(DeviceInfo):
     """Camera info"""
