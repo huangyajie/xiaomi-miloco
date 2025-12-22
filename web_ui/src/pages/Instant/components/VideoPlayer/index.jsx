@@ -8,6 +8,7 @@ import { Spin, message } from 'antd'
 import { useTranslation } from 'react-i18next';
 import { isFirefox, sleep } from '@/utils/util';
 import DefaultCameraBg from '@/assets/images/default-camera-bg.png'
+import JMuxer from 'jmuxer'
 
 /**
  * Detect video codec from binary data
@@ -50,13 +51,21 @@ const detectCodec = (data) => {
 const VideoPlayer = ({ codec = 'avc1.42E01E', poster, style, cameraId, channel, onCanvasRef, onPlay }) => {
   const { t } = useTranslation();
   const canvasRef = useRef(null)
+  const videoRef = useRef(null)
   const wsRef = useRef(null)
   const decoderRef = useRef(null)
+  const currentCodecRef = useRef(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [show, setShow] = useState(false)
   const [isSupported, setIsSupported] = useState(null)
   const [autoCodec, setAutoCodec] = useState(null);
+  const currentCodecTypeRef = useRef(null)
+  const lastSPSRef = useRef(null)
+  const lastPPSRef = useRef(null)
+  const jmuxerRef = useRef(null)
+  const rafRef = useRef(null)
+  const useJMuxerRef = useRef(false)
 
   // detect WebCodecs support
   useEffect(() => {
@@ -140,6 +149,34 @@ const VideoPlayer = ({ codec = 'avc1.42E01E', poster, style, cameraId, channel, 
     return true;
   }
 
+  const splitAnnexB = (buf) => {
+    const data = buf instanceof Uint8Array ? buf : new Uint8Array(buf)
+    const units = []
+    let i = 0
+    while (i < data.length - 3) {
+      if (data[i] === 0x00 && data[i + 1] === 0x00 && ((data[i + 2] === 0x01) || (data[i + 2] === 0x00 && data[i + 3] === 0x01))) {
+        const sync3 = data[i + 2] === 0x01
+        const start = i + (sync3 ? 3 : 4)
+        let j = start
+        while (j < data.length - 3) {
+          if (data[j] === 0x00 && data[j + 1] === 0x00 && ((data[j + 2] === 0x01) || (data[j + 2] === 0x00 && data[j + 3] === 0x01))) {
+            break
+          }
+          j++
+        }
+        units.push(data.slice(start, j))
+        i = j
+      } else {
+        i++
+      }
+    }
+    return units
+  }
+
+  const getH264NalType = (nal) => (nal[0] & 0x1f)
+  const isH264 = (codecStr) => String(codecStr || '').toLowerCase().startsWith('avc1') || String(codecStr || '').toLowerCase().startsWith('h264')
+  const startCode4 = new Uint8Array([0,0,0,1])
+
   useEffect(() => {
     if (onCanvasRef && canvasRef.current) {
       onCanvasRef(canvasRef)
@@ -217,44 +254,173 @@ const VideoPlayer = ({ codec = 'avc1.42E01E', poster, style, cameraId, channel, 
         }
       }
 
-      decoderRef.current = new window.VideoDecoder({
-        output: frame => {
-          createImageBitmap(frame).then(bitmap => {
-            canvas.width = frame.codedWidth
-            canvas.height = frame.codedHeight
-            ctx.drawImage(bitmap, 0, 0)
-            frame.close()
-            bitmap.close && bitmap.close()
-            if (!ready) {
-              setLoading(false)
-              setShow(true)
-              if (onCanvasRef && canvasRef.current) {
-                onCanvasRef(canvasRef)
-              }
-              // handleReady()
-              ready = true
-            }
-          })
-        },
-        error: () => {
-          setError(t('instant.deviceList.deviceDecodeFailed'))
-          message.error(t('instant.deviceList.deviceDecodeFailed'))
+      const drawBitmapCover = (bitmap) => {
+        const dpr = window.devicePixelRatio || 1
+        const cw = canvas.clientWidth || bitmap.width
+        const ch = canvas.clientHeight || bitmap.height
+        const bw = bitmap.width
+        const bh = bitmap.height
+        canvas.width = Math.floor(cw * dpr)
+        canvas.height = Math.floor(ch * dpr)
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+        ctx.clearRect(0, 0, cw, ch)
+        const scale = Math.max(cw / bw, ch / bh)
+        const dw = bw * scale
+        const dh = bh * scale
+        const dx = (cw - dw) / 2
+        const dy = (ch - dh) / 2
+        ctx.drawImage(bitmap, dx, dy, dw, dh)
+      }
+
+      const mapCodecToType = (str) => {
+        const s = String(str || '').toLowerCase()
+        if (s.startsWith('avc1') || s.startsWith('h264')) { return 'h264' }
+        if (s.startsWith('hvc1') || s.startsWith('hev1') || s.startsWith('h265')) { return 'h265' }
+        return null
+      }
+
+      const createDecoder = (cfgCodec) => {
+        if (decoderRef.current) {
+          try { decoderRef.current.flush?.() } catch (e) { console.debug('decoder flush error', e) }
+          try { decoderRef.current.close?.() } catch (e) { console.debug('decoder close error', e) }
         }
-      })
-      decoderRef.current.configure({
-        codec,
-        hardwareAcceleration: 'prefer-hardware',
-      })
+        decoderRef.current = new window.VideoDecoder({
+          output: frame => {
+            createImageBitmap(frame)
+              .then(bitmap => {
+                drawBitmapCover(bitmap)
+                frame.close()
+                bitmap.close && bitmap.close()
+                if (!ready) {
+                  setLoading(false)
+                  setShow(true)
+                  if (onCanvasRef && canvasRef.current) {
+                    onCanvasRef(canvasRef)
+                  }
+                  ready = true
+                }
+              })
+              .catch((e) => { try { frame.close() } catch (err) { console.debug('frame close error', err, e) } })
+          },
+          error: () => {
+            setError(t('instant.deviceList.deviceDecodeFailed'))
+            message.error(t('instant.deviceList.deviceDecodeFailed'))
+          }
+        })
+        try {
+          decoderRef.current.configure({
+            codec: cfgCodec,
+            hardwareAcceleration: 'prefer-hardware',
+          })
+          currentCodecRef.current = cfgCodec
+          currentCodecTypeRef.current = mapCodecToType(cfgCodec)
+          decoderRef.current._waitForKeyFrame = true
+        } catch (e) {
+          console.error('Decoder configure failed:', e)
+        }
+      }
+
+      createDecoder(codec)
+
+      const stopJMuxerLoop = () => {
+        if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null }
+      }
+
+      const startJMuxer = () => {
+        if (jmuxerRef.current) {
+          try { jmuxerRef.current.destroy?.() } catch (e) { console.debug('jmuxer destroy error', e) }
+          jmuxerRef.current = null
+        }
+        useJMuxerRef.current = true
+        jmuxerRef.current = new JMuxer({
+          node: videoRef.current,
+          mode: 'video',
+          fps: 25,
+          clearBuffer: true,
+        })
+        try { videoRef.current.muted = true; videoRef.current.playsInline = true; videoRef.current.play?.().catch((e)=>{ console.debug('video play failed', e) }) } catch (e) { console.debug('video property set failed', e) }
+        const loop = () => {
+          try {
+            if (videoRef.current && canvasRef.current) {
+              const canvas = canvasRef.current
+              const ctx = canvas.getContext('2d')
+              const dpr = window.devicePixelRatio || 1
+              const cw = canvas.clientWidth || videoRef.current.videoWidth || 0
+              const ch = canvas.clientHeight || videoRef.current.videoHeight || 0
+              const bw = videoRef.current.videoWidth || 0
+              const bh = videoRef.current.videoHeight || 0
+              if (bw > 0 && bh > 0 && cw > 0 && ch > 0) {
+                canvas.width = Math.floor(cw * dpr)
+                canvas.height = Math.floor(ch * dpr)
+                ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+                ctx.clearRect(0, 0, cw, ch)
+                const scale = Math.max(cw / bw, ch / bh)
+                const dw = bw * scale
+                const dh = bh * scale
+                const dx = (cw - dw) / 2
+                const dy = (ch - dh) / 2
+                ctx.drawImage(videoRef.current, dx, dy, dw, dh)
+                if (!ready) {
+                  setLoading(false)
+                  setShow(true)
+                  if (onCanvasRef && canvasRef.current) { onCanvasRef(canvasRef) }
+                  ready = true
+                }
+              }
+            }
+          } finally {
+            rafRef.current = requestAnimationFrame(loop)
+          }
+        }
+        stopJMuxerLoop()
+        rafRef.current = requestAnimationFrame(loop)
+      }
       wsRef.current.onmessage = e => {
         if (e.data instanceof ArrayBuffer) {
           const uint8 = new Uint8Array(e.data);
+          let detectedCodecStr = null;
+          let detectedType = null;
           if (!autoCodec) {
             const detected = detectCodec(uint8);
             if (detected !== 'unknown') {
-              setAutoCodec(detected === 'h264' ? 'avc1.42E01E' : 'hvc1.1.6.L93.B0');
+              detectedType = detected;
+              detectedCodecStr = detected === 'h264' ? 'avc1.42E01E' : 'hev1.1.6.L93.B0';
+              setAutoCodec(detectedCodecStr);
             }
           }
-          const useCodec = autoCodec || codec;
+          const useCodec = autoCodec || detectedCodecStr || codec;
+          const useType = detectedType || mapCodecToType(useCodec) || mapCodecToType(codec);
+
+          if (useType === 'h264') {
+            if (!useJMuxerRef.current) {
+              try { decoderRef.current?.close?.() } catch (e) { console.debug('decoder close before jmuxer start', e) }
+              startJMuxer()
+            }
+            // Prepare SPS/PPS injection for IDR frames
+            let feedData = uint8
+            const nals = splitAnnexB(uint8)
+            nals.forEach(nal => {
+              const t = getH264NalType(nal)
+              if (t === 7) { lastSPSRef.current = nal }
+              if (t === 8) { lastPPSRef.current = nal }
+            })
+            const hasIDR = nals.some(nal => getH264NalType(nal) === 5)
+            if (hasIDR && lastSPSRef.current && lastPPSRef.current) {
+              const sps = lastSPSRef.current
+              const pps = lastPPSRef.current
+              const merged = new Uint8Array(startCode4.length + sps.length + startCode4.length + pps.length + uint8.length)
+              let off = 0
+              merged.set(startCode4, off); off += startCode4.length
+              merged.set(sps, off); off += sps.length
+              merged.set(startCode4, off); off += startCode4.length
+              merged.set(pps, off); off += pps.length
+              merged.set(uint8, off)
+              feedData = merged
+            }
+            try { jmuxerRef.current?.feed?.({ video: feedData }) } catch (e) { console.debug('jmuxer feed error', e) }
+            return
+          }
+
           if (decoderRef.current._waitForKeyFrame === undefined) {
             decoderRef.current._waitForKeyFrame = true;
           }
@@ -267,11 +433,47 @@ const VideoPlayer = ({ codec = 'avc1.42E01E', poster, style, cameraId, channel, 
               decoderRef.current._waitForKeyFrame = false;
             }
           }
+          if (currentCodecTypeRef.current && useType && currentCodecTypeRef.current !== useType) {
+            createDecoder(useCodec)
+            // wait for next keyframe after reconfigure
+            decoderRef.current._waitForKeyFrame = true
+            if (!isKey) {
+              return
+            }
+          }
+
+          let chunkData = uint8
+          if (isH264(useCodec)) {
+            const nals = splitAnnexB(uint8)
+            // cache SPS/PPS
+            nals.forEach(nal => {
+              const t = getH264NalType(nal)
+              if (t === 7) { lastSPSRef.current = nal }
+              if (t === 8) { lastPPSRef.current = nal }
+            })
+            // if IDR, ensure SPS/PPS are prepended for decoder init
+            const hasIDR = nals.some(nal => getH264NalType(nal) === 5)
+            if (hasIDR) {
+              const sps = lastSPSRef.current
+              const pps = lastPPSRef.current
+              if (sps && pps) {
+                const totalLen = startCode4.length + sps.length + startCode4.length + pps.length + uint8.length
+                const merged = new Uint8Array(totalLen)
+                let off = 0
+                merged.set(startCode4, off); off += startCode4.length
+                merged.set(sps, off); off += sps.length
+                merged.set(startCode4, off); off += startCode4.length
+                merged.set(pps, off); off += pps.length
+                merged.set(uint8, off)
+                chunkData = merged
+              }
+            }
+          }
           try {
             decoderRef.current.decode(new EncodedVideoChunk({
               type: isKey ? 'key' : 'delta',
               timestamp: performance.now(),
-              data: uint8
+              data: chunkData
             }))
           } catch (err) {
             setError(t('instant.deviceList.deviceDecodeFailed'))
@@ -299,6 +501,10 @@ const VideoPlayer = ({ codec = 'avc1.42E01E', poster, style, cameraId, channel, 
         }
         decoderRef.current = null;
       }
+      try { jmuxerRef.current?.destroy?.() } catch (e) { console.debug('jmuxer destroy error on cleanup', e) }
+      jmuxerRef.current = null
+      useJMuxerRef.current = false
+      if (rafRef.current) { try { cancelAnimationFrame(rafRef.current) } catch (e) { console.debug('cancelAnimationFrame error', e) } rafRef.current = null }
     }
   }, [codec, isSupported, cameraId, channel])
 
@@ -336,6 +542,7 @@ const VideoPlayer = ({ codec = 'avc1.42E01E', poster, style, cameraId, channel, 
           opacity: show ? 1 : 0, transition: 'opacity 0.4s cubic-bezier(.4,0,.2,1)'
         }}
       />
+      <video ref={videoRef} style={{ display: 'none' }} muted playsInline />
     </div>
   )
 }
