@@ -64,6 +64,8 @@ const ChatDialog = () => {
   // check if there is a conversation
   const hasMessages = messages.length > 0;
 
+  const { saveStateBeforeLeave } = socketActions;
+
   // component initialization, restore state
   useEffect(() => {
     // check if there is a temporary chat state to restore
@@ -122,14 +124,20 @@ const ChatDialog = () => {
   }, [globalSendMessage, socketActions, t]);
 
 
+  const stateRef = useRef({ messages, isAnswering });
+  useEffect(() => {
+    stateRef.current = { messages, isAnswering };
+  }, [messages, isAnswering]);
+
   useEffect(() => {
     return () => {
-      if (messages.length > 0 || isAnswering) {
+      const { messages: currentMessages, isAnswering: currentIsAnswering } = stateRef.current;
+      if (currentMessages.length > 0 || currentIsAnswering) {
         console.log('ChatDialog component unmount, save current state');
-        socketActions.saveStateBeforeLeave();
+        saveStateBeforeLeave();
       }
     };
-  }, [messages.length, isAnswering, socketActions]);
+  }, [saveStateBeforeLeave]);
 
   return (
     <div className={styles.chatDialogWrap}>
