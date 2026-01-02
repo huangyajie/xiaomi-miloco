@@ -31,7 +31,8 @@ class HaStateListener:
     """
 
     def __init__(self, ha_config: HAConfig, 
-                 on_state_changed: Optional[Callable[[str, Dict[str, Any], Dict[str, Any]], None]] = None):
+                 on_state_changed: Optional[Callable[[str, Dict[str, Any], Dict[str, Any]], None]] = None,
+                 on_connected: Optional[Callable[[], Any]] = None):
         """
         Initialize the HA Listener.
 
@@ -39,9 +40,11 @@ class HaStateListener:
             ha_config: Home Assistant configuration (url, token).
             on_state_changed: Callback function(entity_id, old_state, new_state) 
                               called when a state changes.
+            on_connected: Callback function called when connection is established and initialized.
         """
         self._ha_config = ha_config
         self._on_state_changed = on_state_changed
+        self._on_connected = on_connected
         
         # State Cache: {entity_id: state_obj}
         # We store the full state object from HA to avoid frequent re-fetching
@@ -152,7 +155,17 @@ class HaStateListener:
 
                     logger.info("HA WebSocket connected and subscribed.")
 
-                    # 4. Listen for messages
+                    # 4. Notify connected callback
+                    if self._on_connected:
+                        try:
+                            if asyncio.iscoroutinefunction(self._on_connected):
+                                asyncio.create_task(self._on_connected())
+                            else:
+                                self._on_connected()
+                        except Exception as e:
+                            logger.error("Error in on_connected callback: %s", e)
+
+                    # 5. Listen for messages
                     async for msg in ws:
                         if msg.type == aiohttp.WSMsgType.TEXT:
                             await self._handle_message(json.loads(msg.data))
@@ -231,9 +244,9 @@ class HaStateListener:
         elif msg_type == 'result':
             # Handle get_states response
             if data.get('success') and isinstance(data.get('result'), list):
-                # Check if it looks like a state list
                 results = data['result']
-                if results and 'entity_id' in results[0]:
+                # Verify if it's a state list (each item should have entity_id)
+                if results and isinstance(results[0], dict) and 'entity_id' in results[0]:
                     logger.info("Received initial state dump (%d entities)", len(results))
                     for state in results:
                         self._state_cache[state['entity_id']] = state

@@ -72,7 +72,11 @@ class TriggerRuleRunner:
         
         # Initialize HA Listener
         ha_config = self.ha_proxy.get_ha_config()
-        self._ha_listener = HaStateListener(ha_config, self._on_ha_state_changed) if ha_config else None
+        self._ha_listener = HaStateListener(
+            ha_config, 
+            self._on_ha_state_changed,
+            on_connected=self._refresh_ha_device_map
+        ) if ha_config else None
         
         # Initialize Trigger Buffer
         self._trigger_buffer = TriggerBuffer(self._execute_buffered_rules)
@@ -171,9 +175,10 @@ class TriggerRuleRunner:
             try:
                 # Execute scheduled task logic
                 asyncio.create_task(self._execute_scheduled_task())
+                
                 # Wait for configured interval
                 await asyncio.sleep(self._interval_seconds)
-            except Exception as e:  # pylint: disable=broad-except
+            except Exception as e:  # pylint: disable=broad-exception-caught
                 logger.error(
                     "Error occurred while executing scheduled task: %s", e)
                 await asyncio.sleep(self._interval_seconds)
@@ -185,35 +190,35 @@ class TriggerRuleRunner:
         val_new = new_state.get('state') if new_state else None
         
         # 1. State Deduplication: Ignore if state value hasn't changed.
+        # But allow events/buttons/scenes to always pass through as they are momentary.
         if val_old == val_new and domain not in ['event', 'button', 'input_button', 'scene']:
             return
         
         logger.info("HA State Changed for %s: %s -> %s", entity_id, val_old, val_new)
 
-        # Find rules that care about this entity
-        dirty_rules = set()
-        
-        # Performance/Noise Filter: Ignore very frequent or irrelevant events
-        noise_keywords = {'no_human_appear', 'heartbeat', 'storage_used', 'recording_duration'}
+        # Performance/Noise Filter: Ignore very frequent or irrelevant entities
+        noise_keywords = {'heartbeat', 'storage_used', 'recording_duration'}
         if any(k in entity_id for k in noise_keywords):
             logger.debug("Ignoring noise entity: %s", entity_id)
             return
 
+        # Find rules that care about this entity
+        dirty_rules = set()
+        
         parent_device_ids = []
         for dev_id, entities in self._ha_device_map.items():
             if entity_id in entities:
                 parent_device_ids.append(dev_id)
 
         for rule_id, rule in self.trigger_rules.items():
-            # Check device match
             if rule.ha_devices:
-                for dev_id in parent_device_ids:
-                    if dev_id in rule.ha_devices:
-                        if trigger_filter.pre_filter(rule):
-                            dirty_rules.add(rule_id)
-                        break
+                # If rule cares about any of the parent devices of this entity
+                if any(dev_id in rule.ha_devices for dev_id in parent_device_ids):
+                    if trigger_filter.pre_filter(rule):
+                        dirty_rules.add(rule_id)
         
         if dirty_rules:
+            logger.info("Marking rules as dirty due to %s change: %s", entity_id, dirty_rules)
             asyncio.create_task(self._trigger_buffer.mark_dirty(dirty_rules, entity_id))
 
     async def _execute_buffered_rules(self, rule_work_load: Dict[str, Set[str]]):
