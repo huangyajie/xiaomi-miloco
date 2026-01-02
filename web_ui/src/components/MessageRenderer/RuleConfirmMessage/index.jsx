@@ -34,6 +34,7 @@ const RuleConfirmMessage = React.memo(({ data, mode = 'queryEdit' }) => {
     confirmed,
     userSelections,
     camera_options = [],
+    ha_device_options = [],
     action_options = []
   } = data;
 
@@ -198,6 +199,7 @@ const RuleConfirmMessage = React.memo(({ data, mode = 'queryEdit' }) => {
             onCancel={actualMode !== 'readonly' ? handleCancel : undefined}
             loading={loading}
             cameraOptions={camera_options}
+            haDeviceOptions={ha_device_options}
             actionOptions={action_options}
             enableCameraRefresh={false}
             enableActionRefresh={false}
@@ -214,6 +216,7 @@ const RuleConfirmMessage = React.memo(({ data, mode = 'queryEdit' }) => {
     prevProps.mode === nextProps.mode &&
     JSON.stringify(prevRule) === JSON.stringify(nextRule) &&
     JSON.stringify(prevProps.data?.camera_options) === JSON.stringify(nextProps.data?.camera_options) &&
+    JSON.stringify(prevProps.data?.ha_device_options) === JSON.stringify(nextProps.data?.ha_device_options) &&
     JSON.stringify(prevProps.data?.action_options) === JSON.stringify(nextProps.data?.action_options)
   );
 

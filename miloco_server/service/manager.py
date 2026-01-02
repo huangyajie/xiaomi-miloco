@@ -129,7 +129,8 @@ class Manager:
             self._trigger_rule_log_dao,
             self._trigger_rule_runner,
             self._miot_proxy,
-            self._mcp_client_manager
+            self._mcp_client_manager,
+            self._ha_service
         )
 
         self._trigger_rule_runner.start_periodic_task()

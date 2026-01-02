@@ -164,6 +164,7 @@ export const useGlobalSocket = () => {
 
           // extract camera_options and action_options from SaveRuleConfirm message
           let cameraOptionsFromConfirm = null;
+          let haDeviceOptionsFromConfirm = null;
           let actionOptionsFromConfirm = null;
           safeMessages.forEach(msg => {
             const { type, namespace, name } = msg.header;
@@ -172,6 +173,9 @@ export const useGlobalSocket = () => {
                 const payload = JSON.parse(msg.payload);
                 if (payload.camera_options) {
                   cameraOptionsFromConfirm = payload.camera_options;
+                }
+                if (payload.ha_device_options) {
+                  haDeviceOptionsFromConfirm = payload.ha_device_options;
                 }
                 if (payload.action_options) {
                   actionOptionsFromConfirm = payload.action_options;
@@ -192,13 +196,14 @@ export const useGlobalSocket = () => {
             return !shouldRemove;
           });
           let mergedMessageData = messageData;
-          if (cameraOptionsFromConfirm || actionOptionsFromConfirm) {
+          if (cameraOptionsFromConfirm || actionOptionsFromConfirm || haDeviceOptionsFromConfirm) {
 
             try {
               const currentPayload = JSON.parse(messageData.payload);
               const mergedPayload = {
                 ...currentPayload,
                 ...(cameraOptionsFromConfirm && { camera_options: cameraOptionsFromConfirm }),
+                ...(haDeviceOptionsFromConfirm && { ha_device_options: haDeviceOptionsFromConfirm }),
                 ...(actionOptionsFromConfirm && { action_options: actionOptionsFromConfirm })
               };
               mergedMessageData = {

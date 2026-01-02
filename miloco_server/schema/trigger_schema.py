@@ -9,7 +9,7 @@ from enum import Enum
 from typing import Optional, List
 
 from miloco_server.schema.mcp_schema import MCPClientStatus
-from miloco_server.schema.miot_schema import CameraInfo
+from miloco_server.schema.miot_schema import CameraInfo, HADeviceInfo
 from pydantic import BaseModel, Field
 
 
@@ -95,6 +95,7 @@ class TriggerRule(BaseModel):
 class TriggerRuleDetail(TriggerRule):
     """Trigger rule response data model, includes camera name and scene name"""
     cameras: List[CameraInfo] = Field(..., description="Camera information list, includes ID and name")
+    ha_devices: Optional[List[HADeviceInfo]] = Field(default_factory=list, description="Home Assistant device information list")
     execute_info: ExecuteInfoDetail = Field(..., description="Trigger execute info details")
 
     @classmethod
@@ -102,20 +103,26 @@ class TriggerRuleDetail(TriggerRule):
         trigger_rule: TriggerRule,
         cameras: List[CameraInfo],
         execute_info: ExecuteInfoDetail,
+        ha_devices: Optional[List[HADeviceInfo]] = None,
     ) -> "TriggerRuleDetail":
-        trigger_rule_data = trigger_rule.model_dump(exclude={"cameras", "execute_info"})
+        trigger_rule_data = trigger_rule.model_dump(exclude={"cameras", "execute_info", "ha_devices"})
         return cls(
             **trigger_rule_data,
             cameras=cameras,
+            ha_devices=ha_devices or [],
             execute_info=execute_info,
         )
 
     @classmethod
     def to_trigger_rule(cls, instance) -> TriggerRule:
         camera_dids = [camera.did for camera in instance.cameras]
+        ha_device_ids = [device.did for device in instance.ha_devices] if instance.ha_devices else []
         execute_info = ExecuteInfoDetail.to_execute_info(instance.execute_info)
-        instance_data = instance.model_dump(exclude={"cameras", "execute_info"})
+        instance_data = instance.model_dump(exclude={"cameras", "execute_info", "ha_devices"})
         return TriggerRule(
-            **instance_data, cameras=camera_dids, execute_info=execute_info)
+            **instance_data,
+            cameras=camera_dids,
+            ha_devices=ha_device_ids,
+            execute_info=execute_info)
 
 

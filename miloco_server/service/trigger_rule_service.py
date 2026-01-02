@@ -6,7 +6,7 @@ Trigger rule service module
 """
 
 import logging
-from typing import List, Optional
+from typing import List, Optional, Any, Dict
 
 from fastapi import WebSocket
 from miot.types import MIoTCameraInfo
@@ -23,11 +23,12 @@ from miloco_server.middleware.exceptions import (
     BusinessException,
 )
 from miloco_server.proxy.miot_proxy import MiotProxy
-from miloco_server.schema.miot_schema import choose_camera_list
+from miloco_server.schema.miot_schema import choose_camera_list, HADeviceInfo
 from miloco_server.schema.trigger_log_schema import TriggerRuleLog
 from miloco_server.schema.trigger_schema import (
     Action, ExecuteInfoDetail, Notify, TriggerRule, TriggerRuleDetail)
 from miloco_server.service.trigger_rule_runner import TriggerRuleRunner
+from miloco_server.service.ha_service import HaService
 
 from service import trigger_rule_dynamic_executor_cache
 from service.trigger_rule_dynamic_executor import RegisterWebSocket
@@ -42,12 +43,14 @@ class TriggerRuleService:
                  trigger_rule_log_dao: TriggerRuleLogDAO,
                  trigger_rule_runner: TriggerRuleRunner,
                  miot_proxy: MiotProxy,
-                 mcp_client_manager: MCPClientManager):
+                 mcp_client_manager: MCPClientManager,
+                 ha_service: Optional[HaService] = None):
         self._trigger_rule_dao = trigger_rule_dao
         self._trigger_rule_log_dao = trigger_rule_log_dao
         self._trigger_rule_runner = trigger_rule_runner
         self._miot_proxy = miot_proxy
         self._mcp_client_manager = mcp_client_manager
+        self._ha_service = ha_service
 
     async def create_trigger_rule(self, trigger_rule: TriggerRule) -> str:
         """
@@ -76,6 +79,15 @@ class TriggerRuleService:
         if invalid_dids:
             ids = ", ".join(invalid_dids)
             raise ValidationException(f"Invalid camera device IDs: {ids}")
+
+        # Validate HA devices if ha_service is available
+        if trigger_rule.ha_devices and self._ha_service:
+            ha_devices_grouped = await self._ha_service.get_ha_devices_grouped()
+            valid_ha_dids = set(ha_devices_grouped.keys())
+            invalid_ha_dids = [did for did in trigger_rule.ha_devices if did not in valid_ha_dids]
+            if invalid_ha_dids:
+                ids = ", ".join(invalid_ha_dids)
+                raise ValidationException(f"Invalid HA device IDs: {ids}")
 
         # Validate notification for content filtering
         if trigger_rule.execute_info and trigger_rule.execute_info.notify:
@@ -178,6 +190,15 @@ class TriggerRuleService:
             ids = ", ".join(invalid_dids)
             raise ValidationException(f"Invalid camera device IDs: {ids}")
 
+        # Validate HA devices if ha_service is available
+        if trigger_rule.ha_devices and self._ha_service:
+            ha_devices_grouped = await self._ha_service.get_ha_devices_grouped()
+            valid_ha_dids = set(ha_devices_grouped.keys())
+            invalid_ha_dids = [did for did in trigger_rule.ha_devices if did not in valid_ha_dids]
+            if invalid_ha_dids:
+                ids = ", ".join(invalid_ha_dids)
+                raise ValidationException(f"Invalid HA device IDs: {ids}")
+
         # Validate notification for content filtering
         if trigger_rule.execute_info and trigger_rule.execute_info.notify:
             await self._check_notify(trigger_rule.execute_info.notify)
@@ -259,9 +280,10 @@ class TriggerRuleService:
             self, trigger_rules: List[TriggerRule]) -> List[TriggerRuleDetail]:
         """Generate trigger rule response"""
         camera_info_dict = await self._miot_proxy.get_cameras()
+        ha_devices_grouped = await self._ha_service.get_ha_devices_grouped() if self._ha_service else {}
         all_mcp_list = await self._mcp_client_manager.get_all_clients_status()
         return [
-            self._build_trigger_rule_detail(trigger_rule, camera_info_dict, all_mcp_list)
+            self._build_trigger_rule_detail(trigger_rule, camera_info_dict, ha_devices_grouped, all_mcp_list)
             for trigger_rule in trigger_rules
         ]
 
@@ -269,22 +291,42 @@ class TriggerRuleService:
     async def make_trigger_rule_detail(self, trigger_rule: TriggerRule) -> TriggerRuleDetail:
         """Generate trigger rule response"""
         camera_info_dict = await self._miot_proxy.get_cameras()
+        ha_devices_grouped = await self._ha_service.get_ha_devices_grouped() if self._ha_service else {}
         all_mcp_list = await self._mcp_client_manager.get_all_clients_status()
-        return self._build_trigger_rule_detail(trigger_rule, camera_info_dict, all_mcp_list)
+        return self._build_trigger_rule_detail(trigger_rule, camera_info_dict, ha_devices_grouped, all_mcp_list)
 
     def _build_trigger_rule_detail(
         self,
         trigger_rule: TriggerRule,
         camera_info_dict: dict[str, MIoTCameraInfo],
+        ha_devices_grouped: dict[str, dict[str, Any]],
         all_mcp_list: List[MCPClientStatus],
     ) -> TriggerRuleDetail:
         """Generate trigger rule response"""
         camera_list = choose_camera_list(trigger_rule.cameras, camera_info_dict)
+        
+        ha_device_list = []
+        for did in trigger_rule.ha_devices:
+            if did in ha_devices_grouped:
+                info = ha_devices_grouped[did]
+                ha_device_list.append(HADeviceInfo(
+                    did=did,
+                    name=info["name"],
+                    online=True,
+                    model="ha_device",
+                    entity_id=info["entities"][0] if info["entities"] else did,
+                    state="online",
+                    room_name=info["area"]
+                ))
+
         choosed_mcp_list = choose_mcp_list(trigger_rule.execute_info.mcp_list, all_mcp_list)
         execute_info = ExecuteInfoDetail.from_execute_info(
             trigger_rule.execute_info, choosed_mcp_list)
         return TriggerRuleDetail.from_trigger_rule(
-            trigger_rule=trigger_rule, cameras=camera_list, execute_info=execute_info)
+            trigger_rule=trigger_rule,
+            cameras=camera_list,
+            ha_devices=ha_device_list,
+            execute_info=execute_info)
 
     async def send_dynamic_execute_log(self, log_id: str, websocket: WebSocket) -> None:
         """Send dynamic execute log"""

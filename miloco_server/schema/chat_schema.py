@@ -8,7 +8,7 @@ Define chat-related data structures including events and instructions
 
 import time
 from typing import List, Optional
-from miloco_server.schema.miot_schema import CameraImgPathSeq, CameraInfo
+from miloco_server.schema.miot_schema import CameraImgPathSeq, CameraInfo, HADeviceInfo
 from miloco_server.schema.trigger_schema import Action, TriggerRule, TriggerRuleDetail
 from pydantic import BaseModel, Field, ConfigDict
 from thespian.actors import ActorAddress
@@ -153,6 +153,7 @@ class Confirmation:
     class SaveRuleConfirm(InstructionPayload):
         rule: TriggerRuleDetail = Field(..., description="Trigger rule details")
         camera_options: List[CameraInfo] = Field(..., description="Camera option list")
+        ha_device_options: Optional[List[HADeviceInfo]] = Field(default_factory=list, description="Home Assistant device option list")
         action_options: List[Action] = Field(..., description="Action option list")
 
 

@@ -7,7 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { Select, Input, Button, Checkbox, Form, Tooltip, Spin, message, Switch } from 'antd';
 import { QuestionCircleOutlined, ReloadOutlined, UpOutlined, DownOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
-import { getHaDevicesGrouped, refreshHaAutomation } from '@/api';
+import { refreshHaAutomation } from '@/api';
 import TimeSelector from '@/components/TimeSelector';
 import {
   TRIGGER_PERIOD_OPTIONS,
@@ -33,7 +33,7 @@ import SelectTagRender from './selectTagRender';
  * @param {boolean} [props.loading=false] - Loading state for submit button
  * @param {Function} [props.onCancel] - Cancel callback function
  * @param {Array} [props.cameraOptions=[]] - Available camera options
- * @param {Array} [props.actionOptions=[]] - Available action options
+ * @param {Array} [props.haDeviceOptions=[]] - Available HA device options
  * @param {boolean} [props.enableCameraRefresh=false] - Whether to enable camera refresh
  * @param {Function} [props.onRefreshCameras] - Camera refresh callback function
  * @param {boolean} [props.enableActionRefresh=false] - Whether to enable action refresh
@@ -49,6 +49,7 @@ const RuleForm = ({
   loading = false,
   onCancel,
   cameraOptions = [],
+  haDeviceOptions: passedHaDeviceOptions = [],
   actionOptions = [],
   enableCameraRefresh = false,
   onRefreshCameras,
@@ -60,7 +61,12 @@ const RuleForm = ({
   const { t } = useTranslation();
   const [form] = Form.useForm();
   const { openModal } = useLogViewerStore();
-  const { availableMcpServices } = useChatStore();
+  const { 
+    availableMcpServices, 
+    haDeviceOptions: globalHaDeviceOptions, 
+    fetchHaDeviceOptions,
+    haDeviceLoading: globalHaLoading 
+  } = useChatStore();
 
   const formData = useRuleFormData(initialRule);
   const { aiGeneratedActions, setAiGeneratedActions } = useLogViewerStore();
@@ -75,32 +81,13 @@ const RuleForm = ({
   const [sendNotification, setSendNotification] = useState(false);
   const [notificationText, setNotificationText] = useState('');
 
-  const [haDeviceOptions, setHaDeviceOptions] = useState([]);
-  const [haLoading, setHaLoading] = useState(false);
   const [triggerDeviceOptions, setTriggerDeviceOptions] = useState([]);
 
-  const fetchHaDevices = async () => {
-    setHaLoading(true);
-    try {
-      const res = await getHaDevicesGrouped();
-      if (res?.code === 0) {
-        const devices = res.data || {};
-        const options = Object.entries(devices).map(([id, info]) => ({
-          label: `${info.name}${info.area ? ` (${info.area})` : ''}`,
-          value: id
-        }));
-        setHaDeviceOptions(options);
-      }
-    } catch (error) {
-      console.error('Failed to fetch HA devices:', error);
-    } finally {
-      setHaLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchHaDevices();
-  }, []);
+    if (passedHaDeviceOptions?.length === 0) {
+      fetchHaDeviceOptions();
+    }
+  }, [passedHaDeviceOptions, fetchHaDeviceOptions]);
 
   useEffect(() => {
     const newOptions = [];
@@ -114,14 +101,23 @@ const RuleForm = ({
         }))
       });
     }
-    if (haDeviceOptions?.length > 0) {
+
+    const haOptions = passedHaDeviceOptions?.length > 0 
+      ? passedHaDeviceOptions.map(item => ({
+          label: `${item.name}${item.room_name ? ` (${item.room_name})` : ''}`,
+          value: item.did,
+          _type: 'ha'
+        }))
+      : globalHaDeviceOptions;
+
+    if (haOptions?.length > 0) {
       newOptions.push({
         label: t('smartCenter.haDevices') || 'HA Devices', 
-        options: haDeviceOptions.map(opt => ({...opt, _type: 'ha'}))
+        options: haOptions
       });
     }
     setTriggerDeviceOptions(newOptions);
-  }, [cameraOptions, haDeviceOptions, t]);
+  }, [cameraOptions, passedHaDeviceOptions, globalHaDeviceOptions, t]);
 
   const [checkedMcpServices, setCheckedMcpServices] = useState([]);
   const [aiRecommendExecuteType, setAiRecommendExecuteType] = useState('dynamic');
@@ -151,7 +147,9 @@ const RuleForm = ({
       const cameras = formData.cameras?.map(camera =>
         typeof camera === 'object' ? camera.did : camera
       ) || [];
-      const ha_devices = formData.ha_devices || [];
+      const ha_devices = formData.ha_devices?.map(device =>
+        typeof device === 'object' ? device.did : device
+      ) || [];
 
       form.setFieldsValue({
         name: formData.name,
@@ -190,7 +188,7 @@ const RuleForm = ({
         // setAdvancedOptionsVisible(true);
       }
     }
-  }, [mode, formData, form, initialSelectedKeys, selectedActionObjects]);
+  }, [mode, formData, form, initialSelectedKeys, selectedActionObjects, setAiGeneratedActions]);
 
 
 
@@ -294,7 +292,7 @@ const RuleForm = ({
 
     // Helper to check if ID is camera or HA
     const isCamera = (id) => cameraOptions.some(c => c.did === id);
-    const isHaDevice = (id) => haDeviceOptions.some(d => d.value === id);
+    const isHaDevice = (id) => (passedHaDeviceOptions?.some(d => d.did === id) || globalHaDeviceOptions.some(d => d.value === id));
 
     selectedDevices.forEach(id => {
       if (isCamera(id)) {
@@ -303,10 +301,7 @@ const RuleForm = ({
       } else if (isHaDevice(id)) {
         ha_devices.push(id);
       } else {
-        // Fallback: Check suffix or assume camera
-        // If we can't find it in options (e.g. offline device), we might have trouble.
-        // However, usually camera DIDs are numeric strings, HA IDs are strings.
-        // Let's assume camera if not found, to match original logic.
+        // Fallback
         cameras.push(id);
       }
     });
@@ -361,7 +356,7 @@ const RuleForm = ({
     }
   };
 
-  const handleFormValuesChange = (changedValues, allValues) => {
+  const handleFormValuesChange = (changedValues) => {
     if ('trigger_devices' in changedValues) {
       setAiRecommendActions([]);
       setAiRecommendExecuteType('dynamic');
@@ -397,12 +392,12 @@ const RuleForm = ({
           options={triggerDeviceOptions}
           className={styles.select}
           dropdownRender={renderDropdownWithRefresh(
-            haLoading || cameraLoading, 
+            globalHaLoading || cameraLoading, 
             t('common.refresh'), 
             async () => {
               if (onRefreshCameras) await refreshMiotInfo(onRefreshCameras);
               await refreshMiotInfo(refreshHaAutomation);
-              await fetchHaDevices();
+              await fetchHaDeviceOptions(true);
               return { code: 0 };
             }
           )}

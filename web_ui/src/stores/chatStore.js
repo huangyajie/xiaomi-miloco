@@ -42,6 +42,9 @@ export const useChatStore = create(
         mcpLoading: false,
         // camera selector UI state
         cameraVisible: false,
+        // HA devices
+        haDeviceOptions: [],
+        haDeviceLoading: false,
         // history related state
         historyList: [],
         historyLoading: false,
@@ -227,6 +230,32 @@ export const useChatStore = create(
           } catch (error) {
             set({ cameraList: [] });
             message.error('fetch camera list failed');
+          }
+        },
+
+        fetchHaDeviceOptions: async (force = false) => {
+          const { haDeviceOptions, haDeviceLoading } = get();
+          if (!force && (haDeviceOptions.length > 0 || haDeviceLoading)) {
+            return;
+          }
+
+          try {
+            set({ haDeviceLoading: true });
+            const { getHaDevicesGrouped } = await import('@/api');
+            const response = await getHaDevicesGrouped();
+            if (response && response.code === 0) {
+              const devices = response.data || {};
+              const options = Object.entries(devices).map(([id, info]) => ({
+                label: `${info.name}${info.area ? ` (${info.area})` : ''}`,
+                value: id,
+                _type: 'ha'
+              }));
+              set({ haDeviceOptions: options });
+            }
+          } catch (error) {
+            console.error('fetch HA devices failed:', error);
+          } finally {
+            set({ haDeviceLoading: false });
           }
         },
 
