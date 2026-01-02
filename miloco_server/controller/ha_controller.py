@@ -13,7 +13,7 @@ from miot.ha_api import HAAutomationInfo
 
 from miloco_server.middleware import verify_token
 from miloco_server.schema.common_schema import NormalResponse
-from miloco_server.schema.miot_schema import HAConfig, HADeviceInfo, HAControlRequest
+from miloco_server.schema.miot_schema import HAConfig, HAControlRequest
 from miloco_server.service.manager import get_manager
 
 logger = logging.getLogger(name=__name__)
@@ -110,12 +110,25 @@ async def get_ha_device_list(current_user: str = Depends(verify_token)):
     logger.info("Get HA device list API called, user: %s", current_user)
 
     devices = await manager.ha_service.get_ha_device_list()
-    
+
     logger.info("Successfully retrieved Home Assistant device list - Count: %s", len(devices))
     return NormalResponse(
         code=0,
         message="Home Assistant device list retrieved successfully",
         data=devices
+    )
+
+
+@router.get(path="/devices_grouped", summary="Get Home Assistant devices grouped by ID", response_model=NormalResponse)
+async def get_ha_devices_grouped(current_user: str = Depends(verify_token)):
+    """Get Home Assistant devices grouped"""
+    logger.info("Get HA devices grouped API called, user: %s", current_user)
+
+    data = await manager.ha_service.get_ha_devices_grouped()
+    return NormalResponse(
+        code=0,
+        message="Home Assistant grouped devices retrieved successfully",
+        data=data
     )
 
 

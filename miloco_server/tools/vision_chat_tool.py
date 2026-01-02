@@ -87,7 +87,7 @@ class VisionChatTool(Actor):
                     request_id=self._request_id,
                     location=self._location_info,
                     choose_camera_device_ids=self._user_choosed_camera_dids)
-                camera_list, all_cameras = await device_chooser.run()
+                camera_list, all_cameras, _, _ = await device_chooser.run()
 
                 if len(camera_list) == 0:
                     camera_list = all_cameras

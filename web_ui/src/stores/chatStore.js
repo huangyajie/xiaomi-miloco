@@ -42,6 +42,10 @@ export const useChatStore = create(
         mcpLoading: false,
         // camera selector UI state
         cameraVisible: false,
+        // HA devices
+        haDeviceOptions: [],
+        haDeviceLoading: false,
+        haDeviceFetched: false,
         // history related state
         historyList: [],
         historyLoading: false,
@@ -224,9 +228,38 @@ export const useChatStore = create(
               set({ cameraList: [] });
               message.error('fetch camera list failed');
             }
-          } catch (error) {
+          } catch {
             set({ cameraList: [] });
             message.error('fetch camera list failed');
+          }
+        },
+
+        fetchHaDeviceOptions: async (force = false) => {
+          const { haDeviceLoading, haDeviceFetched } = get();
+          if (!force && (haDeviceFetched || haDeviceLoading)) {
+            return;
+          }
+
+          try {
+            set({ haDeviceLoading: true });
+            const { getHaDevicesGrouped } = await import("@/api");
+            const response = await getHaDevicesGrouped();
+            if (response && response.code === 0) {
+              const devices = response.data || {};
+              const options = Object.entries(devices).map(([id, info]) => ({
+                label: `${info.name}${info.area ? ` (${info.area})` : ''}`,
+                value: id,
+                _type: "ha"
+              }));
+              set({ haDeviceOptions: options, haDeviceFetched: true });
+            } else {
+              set({ haDeviceFetched: true });
+            }
+          } catch (error) {
+            console.error("fetch HA devices failed:", error);
+            set({ haDeviceFetched: true });
+          } finally {
+            set({ haDeviceLoading: false });
           }
         },
 
@@ -243,7 +276,7 @@ export const useChatStore = create(
             } else {
               message.error('refresh device list failed');
             }
-          } catch (error) {
+          } catch {
             message.error('refresh device list failed');
           } finally {
             set({ isRefreshing: false });
@@ -263,7 +296,7 @@ export const useChatStore = create(
               set({ historyList: [] });
               message.error('fetch history list failed');
             }
-          } catch (error) {
+          } catch {
             set({ historyList: [] });
             message.error('fetch history list failed');
           } finally {
@@ -323,7 +356,7 @@ export const useChatStore = create(
             } else {
               message.error('history record format not supported');
             }
-          } catch (error) {
+          } catch {
             message.error('load history record failed');
           }
         },
@@ -343,7 +376,7 @@ export const useChatStore = create(
               console.error('delete history record failed:', response);
               message.error(responseMessage || 'delete history record failed');
             }
-          } catch (error) {
+          } catch {
             message.error('delete history record failed');
           }
         },

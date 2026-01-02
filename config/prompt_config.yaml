@@ -101,9 +101,20 @@ prompts:
 
   trigger_rule_condition:
     chinese: |
-      你是一个智能摄像头助手，专注于分析家庭环境下的视频内容。你可以识别人物、物体、动作变化以及事件发生顺序，并基于连续的图像序列判断所发生的事件。
-      请你基于我提供的画面内容，准确判断每个场景中发生了什么，并据此判断用户 query 中的条件或状态是否发生。你的回答应基于图像事实，避免臆测。
-      我将为你提供一个按时间顺序排列的图像序列（{frame_interval}毫秒每帧，共{vision_use_img_count}帧）。
+      你是一个智能家居助手，专注于分析家庭环境下的视频内容和设备状态。你可以识别人物、物体、动作变化以及事件发生顺序，并基于连续的图像序列判断所发生的事件。
+      请你基于我提供的画面内容和设备状态信息，准确判断每个场景中发生了什么，并据此判断用户条件中的条件或状态是否发生。你的回答应基于图像事实和设备状态，避免臆测。
+      我将为你提供一个按时间顺序排列的图像序列（{frame_interval}毫秒每帧，共{vision_use_img_count}帧）以及实时的设备状态信息。
+
+      **【判定准则 - 必须严格执行】**：
+      1. **识别触发源**：找到列表中标记为 `[TRIGGER SOURCE]` 的唯一实体。这是本次触发的**唯一原因**。
+      2. **核心主体比对**：判断触发源的名称、ID或功能是否与用户条件中的主体（如“灯”、“门铃”）匹配。
+      3. **状态校验**：
+         - 如果触发源匹配，且其当前状态（State）符合条件（如从 off 变 on，或触发了对应的 Event），才返回 "yes"。
+         - **注意**：对于 `event.` 开头的实体，其 State 只是触发的时间戳，只要它被标记为 `[TRIGGER SOURCE]`，就表示该事件刚刚发生。
+      4. **【强制否决】**：如果 `[TRIGGER SOURCE]` 实体与用户条件主体无关，**即使其他设备处于符合条件的状态，也必须返回 "no"**。
+         - *示例*：条件是“灯打开”，触发源是“无人出现”，即使列表中某个“灯”的状态是 "on"，也必须返回 "no"，因为“灯”本身并没有触发本次动作。
+      5. **视觉辅助**：如果存在图像序列，请结合图像事实进行二次确认。
+
       回复的内容要求以json string格式返回，key值及对应内容如下：
       1. result: 判断用户设置的条件是否发生，确保推理清晰、结论明确，只可以输出 "yes"、"no"； 
       不要返回其他内容。
@@ -111,9 +122,20 @@ prompts:
       {{"result": "yes"}}
       {{"result": "no"}}
     english: |
-      You are an intelligent camera assistant specializing in analyzing video content in home environments. You can recognize people, objects, action changes, and event sequences, and determine what events occurred based on continuous image sequences.
-      Please accurately determine what happened in each scene based on the visual content I provide, and accordingly judge whether the conditions or states in the user's query have occurred. Your answers should be based on image facts, avoiding speculation.
-      I will provide you with an image sequence arranged in chronological order ({frame_interval} ms per frame, {vision_use_img_count} frames total).
+      You are a smart home assistant specializing in analyzing home video content and device states. You can identify people, objects, action changes, and event sequences, and judge events based on continuous image sequences.
+      Please accurately determine what is happening in each scene based on the visual content and device states provided, and judge whether the user's condition or state has occurred. Your answer should be based on image facts and device states, avoiding speculation.
+      I will provide an image sequence arranged chronologically ({frame_interval}ms per frame, {vision_use_img_count} frames total) and real-time device state information.
+
+      **【JUDGMENT CRITERIA - MUST BE STRICTLY FOLLOWED】**:
+      1. **Identify Trigger Source**: Find the unique entity in the list marked as `[TRIGGER SOURCE]`. This is the **ONLY REASON** for this trigger.
+      2. **Core Subject Comparison**: Determine if the name, ID, or function of the trigger source matches the subject in the user's condition (e.g., "Light", "Doorbell").
+      3. **State Verification**:
+         - If the trigger source matches and its current State meets the condition (e.g., changed from off to on, or the corresponding Event was triggered), then return "yes".
+         - **Note**: For entities starting with `event.`, the State is just a timestamp. As long as it is marked as `[TRIGGER SOURCE]`, it means the event has just occurred.
+      4. **【MANDATORY REJECTION】**: If the `[TRIGGER SOURCE]` entity is unrelated to the user's condition subject, **you MUST return "no" even if other devices in the list are in a state that meets the condition**.
+         - *Example*: Condition is "Light turned on", Trigger Source is "No human appear", even if a "Light" in the list has a state of "on", you must return "no" because the "Light" itself did not trigger this action.
+      5. **Visual Assistance**: If an image sequence exists, please perform secondary confirmation based on the image facts.
+
       The response content must be returned in JSON string format, with the following key values and corresponding content:
       1. result: Determine whether the condition set by the user has occurred, ensure clear reasoning and explicit conclusions, only output "yes" or "no";
       Do not return any other content.

@@ -35,6 +35,7 @@ class TriggerRuleDAO:
             "name": rule.name,
             "enabled": rule.enabled,
             "camera_dids": json.dumps(rule.cameras),
+            "ha_devices": json.dumps(rule.ha_devices),
             "condition": rule.condition,
             "execute_info": json.dumps(rule.execute_info.model_dump(mode="json")) if rule.execute_info else None,
             "filter": json.dumps(rule.filter.model_dump(mode="json")) if rule.filter else None,
@@ -43,6 +44,8 @@ class TriggerRuleDAO:
     def _dict_to_trigger_rule(self, data: Dict[str, Any]) -> TriggerRule:
         """Convert database data to TriggerRule object"""
         cameras = json.loads(data["camera_dids"]) if data.get("camera_dids") else []
+        ha_devices = json.loads(data["ha_devices"]) if data.get("ha_devices") else []
+
         execute_info_data = json.loads(data["execute_info"]) if data.get("execute_info") else None
         execute_info = ExecuteInfo(**execute_info_data) if execute_info_data else None
         filter_data = json.loads(data["filter"]) if data.get("filter") else None
@@ -53,6 +56,7 @@ class TriggerRuleDAO:
             name=data["name"],
             enabled=bool(data["enabled"]),
             cameras=cameras,
+            ha_devices=ha_devices,
             condition=data["condition"],
             execute_info=execute_info,
             filter=filter_obj,
@@ -72,8 +76,8 @@ class TriggerRuleDAO:
             rule_id = str(uuid.uuid4())
 
             sql = """
-                INSERT INTO trigger_rule (id, name, enabled, camera_dids, condition, execute_info, filter, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO trigger_rule (id, name, enabled, camera_dids, ha_devices, condition, execute_info, filter, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """
             current_time = datetime.now().isoformat()
             params = (
@@ -81,6 +85,7 @@ class TriggerRuleDAO:
                 rule.name,
                 rule.enabled,
                 json.dumps(rule.cameras),
+                json.dumps(rule.ha_devices),
                 rule.condition,
                 json.dumps(rule.execute_info.model_dump(mode="json")) if rule.execute_info else None,
                 json.dumps(rule.filter.model_dump(mode="json")) if rule.filter else None,
@@ -193,13 +198,14 @@ class TriggerRuleDAO:
         try:
             sql = """
                 UPDATE trigger_rule
-                SET name = ?, enabled = ?, camera_dids = ?, condition = ?, execute_info = ?, filter = ?, updated_at = ?
+                SET name = ?, enabled = ?, camera_dids = ?, ha_devices = ?, condition = ?, execute_info = ?, filter = ?, updated_at = ?
                 WHERE id = ?
             """
             params = (
                 rule.name,
                 rule.enabled,
                 json.dumps(rule.cameras),
+                json.dumps(rule.ha_devices),
                 rule.condition,
                 json.dumps(rule.execute_info.model_dump(mode="json")) if rule.execute_info else None,
                 json.dumps(rule.filter.model_dump(mode="json")) if rule.filter else None,

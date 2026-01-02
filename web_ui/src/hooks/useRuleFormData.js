@@ -19,6 +19,7 @@ export const useRuleFormData = (rule) => {
       return {
         name: '',
         cameras: [],
+        ha_devices: [],
         condition: '',
         ai_recommend_execute_type: 'static',
         ai_recommend_action_descriptions: [],
@@ -33,6 +34,7 @@ export const useRuleFormData = (rule) => {
     const formData = {
       name: rule.name || '',
       cameras: rule.cameras || [],
+      ha_devices: rule.ha_devices || [],
       condition: rule.condition || '',
       ai_recommend_execute_type: rule.execute_info?.ai_recommend_execute_type || 'static',
       ai_recommend_action_descriptions: rule.execute_info?.ai_recommend_action_descriptions || [],
@@ -58,6 +60,7 @@ export const convertFormDataToBackend = (formData) => {
   const {
     name,
     cameras,
+    ha_devices,
     condition,
     ai_recommend_execute_type,
     ai_recommend_action_descriptions,
@@ -75,11 +78,14 @@ export const convertFormDataToBackend = (formData) => {
     ? cameras.map(camera => typeof camera === 'object' ? (camera.did || camera) : camera)
     : [];
 
+  const ha_device_ids = Array.isArray(ha_devices) ? ha_devices : [];
+
   const mcp_list_ids = mcp_list?.length > 0 ? mcp_list.map(mcp => mcp?.client_id) : [];
 
   const backendData = {
     name,
     cameras: camera_dids,
+    ha_devices: ha_device_ids,
     condition,
     execute_info: {
       ai_recommend_execute_type: ai_recommend_execute_type || 'static',
@@ -114,6 +120,7 @@ export const convertBackendToFormData = (backendData) => {
   return {
     name: backendData.name || '',
     cameras: backendData.cameras || [],
+    ha_devices: backendData.ha_devices || [],
     condition: backendData.condition || '',
     ai_recommend_execute_type: backendData.execute_info?.ai_recommend_execute_type || 'static',
     ai_recommend_action_descriptions: backendData.execute_info?.ai_recommend_action_descriptions || [],

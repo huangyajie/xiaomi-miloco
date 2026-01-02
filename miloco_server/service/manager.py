@@ -105,6 +105,7 @@ class Manager:
         self._trigger_rule_runner = TriggerRuleRunner(
             trigger_rules=self._trigger_rule_dao.get_all(enabled_only=False),
             miot_proxy=self._miot_proxy,
+            ha_proxy=self._ha_proxy,
             get_llm_proxy_by_purpose=self.get_llm_proxy_by_purpose,
             get_language=self.get_language,
             tool_executor=self._tool_executor,
@@ -128,7 +129,8 @@ class Manager:
             self._trigger_rule_log_dao,
             self._trigger_rule_runner,
             self._miot_proxy,
-            self._mcp_client_manager
+            self._mcp_client_manager,
+            self._ha_service
         )
 
         self._trigger_rule_runner.start_periodic_task()

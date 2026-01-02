@@ -14,7 +14,7 @@ from miloco_server.utils.llm_utils.device_chooser import DeviceChooser
 
 from miloco_server import actor_system
 from miloco_server.schema.chat_schema import Confirmation, Dialog, Event, InstructionPayload, Internal
-from miloco_server.schema.miot_schema import CameraInfo
+from miloco_server.schema.miot_schema import CameraInfo, HADeviceInfo
 from miloco_server.schema.trigger_schema import Action, Notify, TriggerRule, TriggerRuleDetail, ExecuteInfo, ExecuteType, ExecuteInfoDetail
 from pydantic.dataclasses import dataclass
 from thespian.actors import Actor, ActorAddress, ActorExitRequest
@@ -107,9 +107,11 @@ class RuleCreateTool(Actor):
             notify = name
 
         try:
-            chosen_camera_infos, all_camera_infos = await self._choose_camera(location)
-            if not chosen_camera_infos:
-                chosen_camera_infos = all_camera_infos
+            chosen_cameras, all_cameras, chosen_ha_devices, all_ha_devices = await self._choose_devices(
+                condition, location)
+            # If nothing chosen and no condition/location, default to all cameras for backward compatibility
+            if not chosen_cameras and not chosen_ha_devices and not condition and not location:
+                chosen_cameras = all_cameras
 
             default_actions = await self._default_preset_action_manager.get_all_default_actions(self._mcp_ids)
             miot_scene_actions = default_actions.get(LocalMcpClientId.MIOT_MANUAL_SCENES, {})
@@ -129,7 +131,8 @@ class RuleCreateTool(Actor):
             choosed_mcp_list = await self._choose_mcp_list()
             trigger_rule_detail = TriggerRuleDetail(
                 name=name,
-                cameras=chosen_camera_infos,
+                cameras=chosen_cameras,
+                ha_devices=chosen_ha_devices,
                 condition=condition,
                 execute_info=ExecuteInfoDetail.from_execute_info(
                     execute_info, choosed_mcp_list),
@@ -138,7 +141,8 @@ class RuleCreateTool(Actor):
 
             save_rule_confirm = Confirmation.SaveRuleConfirm(
                 rule=trigger_rule_detail,
-                camera_options=all_camera_infos,
+                camera_options=all_cameras,
+                ha_device_options=all_ha_devices,
                 action_options=[
                     action
                     for actions in default_actions.values()
@@ -212,10 +216,13 @@ class RuleCreateTool(Actor):
         return no_matched_action_descriptions, matched_actions
 
 
-    async def _choose_camera(self, location: Optional[str] = None) -> tuple[List[CameraInfo], List[CameraInfo]]:
-        """Choose camera"""
+    async def _choose_devices(
+            self, condition: str, location: Optional[str] = None
+    ) -> tuple[List[CameraInfo], List[CameraInfo], List[HADeviceInfo], List[HADeviceInfo]]:
+        """Choose cameras and HA devices"""
         device_chooser = DeviceChooser(
             request_id=self._request_id,
+            condition=condition,
             location=location,
             choose_camera_device_ids=self._camera_ids)
         return await device_chooser.run()

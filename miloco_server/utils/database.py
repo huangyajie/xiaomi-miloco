@@ -62,6 +62,8 @@ class SQLiteConnector:
                             "Trigger rule table not found, creating...")
                         self._create_trigger_rule_table(conn)
                         tables_created.append("trigger_rule")
+                    else:
+                        self._ensure_trigger_rule_columns(conn)
 
                     if "trigger_rule_log" not in existing_tables:
                         logger.info(
@@ -152,6 +154,7 @@ class SQLiteConnector:
                 name TEXT NOT NULL,
                 enabled BOOLEAN DEFAULT 1,
                 camera_dids TEXT NOT NULL,  -- JSON format storage for camera device ID list
+                ha_devices TEXT,            -- JSON format storage for Home Assistant device ID list
                 condition TEXT NOT NULL,    -- Trigger condition
                 execute_info TEXT,          -- JSON format storage for ExecuteInfo object
                 filter TEXT,                 -- JSON format storage for TriggerFilter object
@@ -169,6 +172,18 @@ class SQLiteConnector:
         )
 
         logger.info("Trigger rule table created successfully")
+
+    def _ensure_trigger_rule_columns(self, conn: sqlite3.Connection) -> None:
+        """Ensure trigger rule table has all required columns"""
+        cursor = conn.cursor()
+        cursor.execute("PRAGMA table_info(trigger_rule)")
+        columns = {row[1] for row in cursor.fetchall()}
+
+        if "ha_devices" not in columns:
+            logger.info("Adding ha_devices column to trigger_rule table")
+            cursor.execute("ALTER TABLE trigger_rule ADD COLUMN ha_devices TEXT")
+
+        conn.commit()
 
     def _create_model_vendor_table(self, conn: sqlite3.Connection) -> None:
         """Create model vendor table"""

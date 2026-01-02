@@ -7,6 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { Select, Input, Button, Checkbox, Form, Tooltip, Spin, message, Switch } from 'antd';
 import { QuestionCircleOutlined, ReloadOutlined, UpOutlined, DownOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
+import { refreshHaAutomation } from '@/api';
 import TimeSelector from '@/components/TimeSelector';
 import {
   TRIGGER_PERIOD_OPTIONS,
@@ -32,7 +33,7 @@ import SelectTagRender from './selectTagRender';
  * @param {boolean} [props.loading=false] - Loading state for submit button
  * @param {Function} [props.onCancel] - Cancel callback function
  * @param {Array} [props.cameraOptions=[]] - Available camera options
- * @param {Array} [props.actionOptions=[]] - Available action options
+ * @param {Array} [props.haDeviceOptions=[]] - Available HA device options
  * @param {boolean} [props.enableCameraRefresh=false] - Whether to enable camera refresh
  * @param {Function} [props.onRefreshCameras] - Camera refresh callback function
  * @param {boolean} [props.enableActionRefresh=false] - Whether to enable action refresh
@@ -48,8 +49,8 @@ const RuleForm = ({
   loading = false,
   onCancel,
   cameraOptions = [],
+  haDeviceOptions: passedHaDeviceOptions = [],
   actionOptions = [],
-  enableCameraRefresh = false,
   onRefreshCameras,
   enableActionRefresh = false,
   onRefreshActions,
@@ -59,7 +60,13 @@ const RuleForm = ({
   const { t } = useTranslation();
   const [form] = Form.useForm();
   const { openModal } = useLogViewerStore();
-  const { availableMcpServices } = useChatStore();
+  const {
+    availableMcpServices,
+    haDeviceOptions: globalHaDeviceOptions,
+    fetchHaDeviceOptions,
+    haDeviceLoading: globalHaLoading,
+    haDeviceFetched: globalHaFetched
+  } = useChatStore();
 
   const formData = useRuleFormData(initialRule);
   const { aiGeneratedActions, setAiGeneratedActions } = useLogViewerStore();
@@ -73,6 +80,44 @@ const RuleForm = ({
   const [selectedActions, setSelectedActions] = useState([]);
   const [sendNotification, setSendNotification] = useState(false);
   const [notificationText, setNotificationText] = useState('');
+
+  const [triggerDeviceOptions, setTriggerDeviceOptions] = useState([]);
+
+  useEffect(() => {
+    if (passedHaDeviceOptions?.length === 0 && !globalHaFetched) {
+      fetchHaDeviceOptions();
+    }
+  }, [passedHaDeviceOptions, fetchHaDeviceOptions, globalHaFetched]);
+
+  useEffect(() => {
+    const newOptions = [];
+    if (cameraOptions?.length > 0) {
+      newOptions.push({
+        label: t('smartCenter.cameras'),
+        options: cameraOptions.map(item => ({
+          label: `${item.name}(${item.room_name || ''})`,
+          value: item.did,
+          _type: 'camera'
+        }))
+      });
+    }
+
+    const haOptions = passedHaDeviceOptions?.length > 0
+      ? passedHaDeviceOptions.map(item => ({
+          label: `${item.name}${item.room_name ? ` (${item.room_name})` : ''}`,
+          value: item.did,
+          _type: 'ha'
+        }))
+      : globalHaDeviceOptions;
+
+    if (haOptions?.length > 0) {
+      newOptions.push({
+        label: t('smartCenter.haDevices') || 'HA Devices',
+        options: haOptions
+      });
+    }
+    setTriggerDeviceOptions(newOptions);
+  }, [cameraOptions, passedHaDeviceOptions, globalHaDeviceOptions, t, mode]);
 
   const [checkedMcpServices, setCheckedMcpServices] = useState([]);
   const [aiRecommendExecuteType, setAiRecommendExecuteType] = useState('dynamic');
@@ -92,19 +137,24 @@ const RuleForm = ({
     }
     setAiRecommendActions(aiGeneratedActions);
     setAiRecommendExecuteType(aiGeneratedActions.length > 0 ? 'static' : 'dynamic');
-  }, [aiGeneratedActions]);
+  }, [aiGeneratedActions, mode]);
 
   useEffect(() => {
     if (mode === 'create') {
       setAiGeneratedActions([]);
     }
     if (mode !== 'create' && formData) {
+      const cameras = formData.cameras?.map(camera =>
+        typeof camera === 'object' ? camera.did : camera
+      ) || [];
+      const ha_devices = formData.ha_devices?.map(device =>
+        typeof device === 'object' ? device.did : device
+      ) || [];
+
       form.setFieldsValue({
         name: formData.name,
         condition: formData.condition,
-        cameras: formData.cameras?.map(camera =>
-          typeof camera === 'object' ? camera.did : camera
-        ) || [],
+        trigger_devices: [...cameras, ...ha_devices],
       });
 
       if (initialSelectedKeys && initialSelectedKeys.length > 0) {
@@ -138,7 +188,7 @@ const RuleForm = ({
         // setAdvancedOptionsVisible(true);
       }
     }
-  }, [mode, formData, form, initialSelectedKeys, selectedActionObjects]);
+  }, [mode, formData, form, initialSelectedKeys, selectedActionObjects, setAiGeneratedActions]);
 
 
 
@@ -235,13 +285,31 @@ const RuleForm = ({
         introduction: action.introduction || '',
       }));
 
-    const cameras = values.cameras.map(did => {
-      const camera = cameraOptions.find(c => c.did === did);
-      return camera || did;
+    // Split trigger_devices into cameras and ha_devices
+    const selectedDevices = values.trigger_devices || [];
+    const cameras = [];
+    const ha_devices = [];
+
+    // Helper to check if ID is camera or HA
+    const isCamera = (id) => cameraOptions.some(c => c.did === id);
+    const isHaDevice = (id) => (passedHaDeviceOptions?.some(d => d.did === id) || globalHaDeviceOptions.some(d => d.value === id));
+
+    selectedDevices.forEach(id => {
+      if (isCamera(id)) {
+        const camera = cameraOptions.find(c => c.did === id);
+        cameras.push(camera || id);
+      } else if (isHaDevice(id)) {
+        ha_devices.push(id);
+      } else {
+        // Fallback
+        cameras.push(id);
+      }
     });
+
     const formData = {
       name: values.name,
       cameras,
+      ha_devices,
       condition: values.condition,
       automation_actions,
       ai_recommend_execute_type: aiRecommendExecuteType,
@@ -288,8 +356,8 @@ const RuleForm = ({
     }
   };
 
-  const handleFormValuesChange = (changedValues, allValues) => {
-    if ('cameras' in changedValues) {
+  const handleFormValuesChange = (changedValues) => {
+    if ('trigger_devices' in changedValues) {
       setAiRecommendActions([]);
       setAiRecommendExecuteType('dynamic');
     }
@@ -312,24 +380,29 @@ const RuleForm = ({
 
       <Form.Item
         className={styles.customFormLabel}
-        label={t('smartCenter.selectCameras')}
-        name="cameras"
-        rules={[{ required: true, message: t('smartCenter.pleaseSelectCameras') }]}
+        label={t('smartCenter.selectTriggerDevices')}
+        name="trigger_devices"
+        rules={[{ required: true, message: t('smartCenter.pleaseSelectTriggerDevices') }]}
       >
         <Select
           mode="multiple"
           allowClear
-          placeholder={t('smartCenter.pleaseSelectCameras')}
+          placeholder={t('smartCenter.pleaseSelectTriggerDevices')}
           disabled={isSubmitDisabled}
-          options={cameraOptions?.map?.(item => ({
-            label: `${item.name}(${item.room_name || ''})`,
-            value: item.did
-          }))}
+          options={triggerDeviceOptions}
           className={styles.select}
-          dropdownRender={enableCameraRefresh && onRefreshCameras
-            ? renderDropdownWithRefresh(cameraLoading, t('smartCenter.refreshCameras'), onRefreshCameras)
-            : undefined
-          }
+          dropdownRender={renderDropdownWithRefresh(
+            globalHaLoading || cameraLoading,
+            t('common.refresh'),
+            async () => {
+              if (onRefreshCameras) {
+                await refreshMiotInfo(onRefreshCameras);
+              }
+              await refreshMiotInfo(refreshHaAutomation);
+              await fetchHaDeviceOptions(true);
+              return { code: 0 };
+            }
+          )}
         />
       </Form.Item>
 
