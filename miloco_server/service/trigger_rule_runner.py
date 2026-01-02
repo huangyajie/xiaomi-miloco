@@ -69,15 +69,15 @@ class TriggerRuleRunner:
         self._is_running: bool = False
         self._interval_seconds = TRIGGER_RULE_RUNNER_CONFIG["interval_seconds"]
         self._vision_use_img_count = TRIGGER_RULE_RUNNER_CONFIG["vision_use_img_count"]
-        
+
         # Initialize HA Listener
         ha_config = self.ha_proxy.get_ha_config()
         self._ha_listener = HaStateListener(
-            ha_config, 
+            ha_config,
             self._on_ha_state_changed,
             on_connected=self._refresh_ha_device_map
         ) if ha_config else None
-        
+
         # Initialize Trigger Buffer
         self._trigger_buffer = TriggerBuffer(self._execute_buffered_rules)
 
@@ -98,13 +98,13 @@ class TriggerRuleRunner:
         """Extract all entity IDs from all rules and update the HA listener."""
         if not self._ha_listener:
             return
-            
+
         all_watched = set()
         for rule in self.trigger_rules.values():
             if rule.ha_devices:
                 for dev_id in rule.ha_devices:
                     all_watched.update(self._ha_device_map.get(dev_id, []))
-        
+
         if all_watched:
             logger.info("Updating watched entities (%d)", len(all_watched))
             self._ha_listener.update_watched_entities(list(all_watched))
@@ -114,7 +114,7 @@ class TriggerRuleRunner:
         try:
             if not self.ha_proxy:
                 return
-            
+
             template = """
             {
               {% set ns = namespace(devices=[]) %}
@@ -125,7 +125,7 @@ class TriggerRuleRunner:
                 {% endif %}
               {% endfor %}
               {% set unique_devices = ns.devices | unique | list %}
-              
+
               {% for dev_id in unique_devices %}
                 "{{ dev_id }}": {{ device_entities(dev_id) | list | to_json }}{% if not loop.last %},{% endif %}
               {% endfor %}
@@ -135,7 +135,7 @@ class TriggerRuleRunner:
                 res = await self.ha_proxy.ha_client.render_template_async(template)
                 self._ha_device_map = json.loads(res)
                 logger.info("Refreshed HA device map, found %d devices", len(self._ha_device_map))
-                
+
                 # Update watched entities with all entities belonging to rules' ha_devices
                 if self._ha_listener:
                     all_entities = set()
@@ -143,11 +143,11 @@ class TriggerRuleRunner:
                         if rule.ha_devices:
                             for dev_id in rule.ha_devices:
                                 all_entities.update(self._ha_device_map.get(dev_id, []))
-                    
+
                     watched_list = list(all_entities)
                     logger.info("Updating watched entities (%d): %s", len(watched_list), watched_list)
                     self._ha_listener.update_watched_entities(watched_list)
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             logger.error("Failed to refresh HA device map: %s", e)
 
     def _get_vision_understaning_llm_proxy(self) -> LLMProxy:
@@ -175,7 +175,7 @@ class TriggerRuleRunner:
             try:
                 # Execute scheduled task logic
                 asyncio.create_task(self._execute_scheduled_task())
-                
+
                 # Wait for configured interval
                 await asyncio.sleep(self._interval_seconds)
             except Exception as e:  # pylint: disable=broad-exception-caught
@@ -185,26 +185,26 @@ class TriggerRuleRunner:
 
     def _on_ha_state_changed(self, entity_id: str, old_state: Dict[str, Any], new_state: Dict[str, Any]):
         """Callback for HA state changes."""
-        domain = entity_id.split('.')[0]
-        val_old = old_state.get('state') if old_state else None
-        val_new = new_state.get('state') if new_state else None
-        
+        domain = entity_id.split(".")[0]
+        val_old = old_state.get("state") if old_state else None
+        val_new = new_state.get("state") if new_state else None
+
         # 1. State Deduplication: Ignore if state value hasn't changed.
         # But allow events/buttons/scenes to always pass through as they are momentary.
-        if val_old == val_new and domain not in ['event', 'button', 'input_button', 'scene']:
+        if val_old == val_new and domain not in ["event", "button", "input_button", "scene"]:
             return
-        
+
         logger.info("HA State Changed for %s: %s -> %s", entity_id, val_old, val_new)
 
         # Performance/Noise Filter: Ignore very frequent or irrelevant entities
-        noise_keywords = {'heartbeat', 'storage_used', 'recording_duration'}
+        noise_keywords = {"heartbeat", "storage_used", "recording_duration"}
         if any(k in entity_id for k in noise_keywords):
             logger.debug("Ignoring noise entity: %s", entity_id)
             return
 
         # Find rules that care about this entity
         dirty_rules = set()
-        
+
         parent_device_ids = []
         for dev_id, entities in self._ha_device_map.items():
             if entity_id in entities:
@@ -216,7 +216,7 @@ class TriggerRuleRunner:
                 if any(dev_id in rule.ha_devices for dev_id in parent_device_ids):
                     if trigger_filter.pre_filter(rule):
                         dirty_rules.add(rule_id)
-        
+
         if dirty_rules:
             logger.info("Marking rules as dirty due to %s change: %s", entity_id, dirty_rules)
             asyncio.create_task(self._trigger_buffer.mark_dirty(dirty_rules, entity_id))
@@ -230,13 +230,13 @@ class TriggerRuleRunner:
         """Check a specific batch of rules."""
         vision_proxy = self._get_vision_understaning_llm_proxy()
         planning_proxy = self._get_planning_llm_proxy()
-        
+
         if not vision_proxy and not planning_proxy:
             logger.warning("No LLM proxy available")
             return
 
         start_time = int(time.time() * 1000)
-        
+
         # Normalize work load to Dict[rid, sources]
         if isinstance(rule_work_load, list):
             target_rules_with_sources = {rid: set() for rid in rule_work_load}
@@ -246,7 +246,7 @@ class TriggerRuleRunner:
         # Filter enabled rules and split by type
         vision_rules = []
         text_rules = []
-        
+
         for rid, sources in target_rules_with_sources.items():
             rule = self.trigger_rules.get(rid)
             if rule and trigger_filter.pre_filter(rule):
@@ -254,7 +254,7 @@ class TriggerRuleRunner:
                     vision_rules.append((rid, rule, sources))
                 else:
                     text_rules.append((rid, rule, sources))
-        
+
         # Execute vision rules with Vision Model
         if vision_rules and vision_proxy:
             await self._execute_rules_logic(vision_rules, vision_proxy, start_time)
@@ -269,14 +269,16 @@ class TriggerRuleRunner:
             else:
                 logger.warning("Text rules skipped because no LLM is available")
 
-    async def _execute_rules_logic(self, target_rules: List[tuple[str, TriggerRule, Set[str]]], llm_proxy: LLMProxy, start_time: int):
+    async def _execute_rules_logic(
+            self, target_rules: List[tuple[str, TriggerRule, Set[str]]],
+            llm_proxy: LLMProxy, start_time: int):
         """Core execution logic shared by periodic and event-driven triggers."""
-        
+
         # 1. Get Camera Data
         relevant_cameras = set()
         for _, rule, _ in target_rules:
             relevant_cameras.update(rule.cameras)
-        
+
         camera_motion_dict = {}
         camera_info_dict = {}
 
@@ -322,17 +324,20 @@ class TriggerRuleRunner:
                             # Clone state info and mark if it was the trigger source
                             state_info = device_states[entity].copy()
                             if entity in trigger_sources:
-                                state_info['_is_trigger_source'] = True
+                                state_info["_is_trigger_source"] = True
                             rule_device_states[entity] = state_info
 
-            debug_states = {k: v.get('state') for k, v in rule_device_states.items()}
-            logger.info("Checking rule %s with device states: %s, trigger_sources: %s", rule.name, debug_states, trigger_sources)
+            debug_states = {k: v.get("state") for k, v in rule_device_states.items()}
+            logger.info(
+                "Checking rule %s with device states: %s, trigger_sources: %s",
+                rule.name, debug_states, trigger_sources)
 
             # If rule has no cameras and no devices, skip
             if not rule.cameras and not rule.ha_devices:
                 continue
 
-            task = self._check_trigger_condition(rule, llm_proxy, camera_motion_dict, camera_info_dict, rule_device_states)
+            task = self._check_trigger_condition(
+                rule, llm_proxy, camera_motion_dict, camera_info_dict, rule_device_states)
             tasks.append(task)
             rule_info_list.append((rule_id, rule))
 
@@ -346,39 +351,40 @@ class TriggerRuleRunner:
             if isinstance(condition_result_list, Exception):
                 logger.error("Rule check failed for %s: %s", rule_id, condition_result_list)
                 continue
-                
+
             if not isinstance(condition_result_list, list):
                 continue
 
             # Post filter logic
             # Note: For non-camera rules, we use a virtual "device" tag for filter
             execable = False
-            
+
             if rule.cameras:
                 # Camera based filter
                 # camera_info should be present if rule.cameras is set, but check safety
                 execable = any([
                     trigger_filter.post_filter(
                         rule_id,
-                        f"{condition_result.camera_info.did},{condition_result.channel}" if condition_result.camera_info else "global",
+                        f"{condition_result.camera_info.did},"
+                        f"{condition_result.channel}" if condition_result.camera_info else "global",
                         condition_result.result)
                     for condition_result in condition_result_list
                 ])
             else:
                 # Pure device based filter
-                # We assume if LLM says yes, it matches. 
+                # We assume if LLM says yes, it matches.
                 # result is True if ANY condition result is True
                 is_triggered = any(r.result for r in condition_result_list)
-                
+
                 # Deduplication: Only proceed if the AI conclusion changed
                 last_conclusion = self._last_rule_conclusions.get(rule_id)
                 self._last_rule_conclusions[rule_id] = is_triggered
-                
+
                 if last_conclusion == is_triggered:
                     logger.info("Rule %s: AI conclusion remains %s, skipping execution", rule.name, is_triggered)
                     execable = False
                 else:
-                    # Note: We still use post_filter for global state persistence if needed, 
+                    # Note: We still use post_filter for global state persistence if needed,
                     # but our internal check takes precedence for deduplication.
                     execable = trigger_filter.post_filter(rule_id, "global", is_triggered)
 
@@ -395,16 +401,16 @@ class TriggerRuleRunner:
     async def _execute_scheduled_task(self):
         """Specific execution logic for scheduled tasks"""
         logger.debug("Executing scheduled task - checking trigger rules")
-        
+
         # Periodic check is for:
         # 1. Vision-based rules (contain cameras)
         # 2. Other poll-based rules (if any)
         # Pure HA rules are skipped here because they are handled by WebSocket events.
         enabled_rules = [
-            rule_id for rule_id, rule in self.trigger_rules.items() 
+            rule_id for rule_id, rule in self.trigger_rules.items()
             if rule.cameras and trigger_filter.pre_filter(rule)
         ]
-        
+
         if enabled_rules:
             await self._check_rules_batch(enabled_rules)
 
@@ -413,9 +419,7 @@ class TriggerRuleRunner:
             execute_id: str,
             start_time: int,
             rule: TriggerRule,
-            camera_motion_dict: dict[str, dict[int,
-                                           tuple[bool,
-                                                 Optional[CameraImgSeq]]]],
+            camera_motion_dict: dict[str, dict[int, tuple[bool, Optional[CameraImgSeq]]]],
             condition_result_list: list[TriggerConditionResult],
             execute_result: Optional[ExecuteResult] = None):
         """Record rule trigger and execution logs, save to database"""
@@ -426,8 +430,10 @@ class TriggerRuleRunner:
         for condition_result in condition_result_list:
             # Handle camera images if available
             if condition_result.camera_info:
-                 is_motion, camera_img_seq = camera_motion_dict.get(condition_result.camera_info.did, {}).get(condition_result.channel, (False, None))
-                 if is_motion and condition_result.result and camera_img_seq:
+                is_motion, camera_img_seq = camera_motion_dict.get(
+                    condition_result.camera_info.did, {}).get(
+                        condition_result.channel, (False, None))
+                if is_motion and condition_result.result and camera_img_seq:
                     path_seq: CameraImgPathSeq = await camera_img_seq.store_to_path()
                     condition_result.images = path_seq.img_list
 
@@ -459,14 +465,14 @@ class TriggerRuleRunner:
             return
 
         self._is_running = True
-        
+
         # Start HA Listener
         if self._ha_listener:
             asyncio.create_task(self._ha_listener.start())
-        
+
         # Refresh device map once on startup
         asyncio.create_task(self._refresh_ha_device_map())
-            
+
         self._task = asyncio.create_task(self._periodic_task())
         logger.info("Scheduled task started, executing every %d seconds", self._interval_seconds)
 
@@ -477,7 +483,7 @@ class TriggerRuleRunner:
             return
 
         self._is_running = False
-        
+
         # Stop HA Listener
         if self._ha_listener:
             await self._ha_listener.stop()
@@ -521,12 +527,12 @@ class TriggerRuleRunner:
             for camera_id in rule.cameras:
                 if camera_id not in camera_info_dict:
                     continue
-                
+
                 camera_info = camera_info_dict[camera_id]
                 channel_motion_dict = camera_motion_dict.get(camera_id, {})
-                for channel, (if_motion, camera_img_seq) in channel_motion_dict.items():
+                for channel, (_, camera_img_seq) in channel_motion_dict.items():
                     if camera_img_seq:
-                         cameras_video[camera_id, channel] = camera_img_seq
+                        cameras_video[camera_id, channel] = camera_img_seq
                     else:
                         condition_result_list.append(
                             TriggerConditionResult(camera_info=camera_info,
@@ -585,14 +591,14 @@ class TriggerRuleRunner:
                 logger.error(
                     "Failed to parse JSON. Content: %s, Error: %s", content, e)
                 continue
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-except
                 logger.error("Error processing content: %s, Error: %s", content, e)
                 continue
-            
+
             # Construct result
             # If it was a dummy camera, camera_info is None or dummy
             cam_info = camera_info_dict.get(camera_id) if camera_id != "no_camera" else None
-            
+
             condition_result = TriggerConditionResult(
                 camera_info=cam_info,
                 channel=channel,
@@ -600,7 +606,7 @@ class TriggerRuleRunner:
             )
 
             condition_result_list.append(condition_result)
-            
+
         return condition_result_list
 
     def _check_camera_motion(self, camera_img_seq: CameraImgSeq) -> bool:

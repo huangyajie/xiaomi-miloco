@@ -227,7 +227,7 @@ export const useChatStore = create(
               set({ cameraList: [] });
               message.error('fetch camera list failed');
             }
-          } catch (error) {
+          } catch {
             set({ cameraList: [] });
             message.error('fetch camera list failed');
           }
@@ -272,7 +272,7 @@ export const useChatStore = create(
             } else {
               message.error('refresh device list failed');
             }
-          } catch (error) {
+          } catch {
             message.error('refresh device list failed');
           } finally {
             set({ isRefreshing: false });
@@ -292,7 +292,7 @@ export const useChatStore = create(
               set({ historyList: [] });
               message.error('fetch history list failed');
             }
-          } catch (error) {
+          } catch {
             set({ historyList: [] });
             message.error('fetch history list failed');
           } finally {
@@ -352,7 +352,7 @@ export const useChatStore = create(
             } else {
               message.error('history record format not supported');
             }
-          } catch (error) {
+          } catch {
             message.error('load history record failed');
           }
         },
@@ -372,7 +372,7 @@ export const useChatStore = create(
               console.error('delete history record failed:', response);
               message.error(responseMessage || 'delete history record failed');
             }
-          } catch (error) {
+          } catch {
             message.error('delete history record failed');
           }
         },

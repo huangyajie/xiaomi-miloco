@@ -63,7 +63,7 @@ class DeviceChooser(BaseLLMUtil):
             user_msg += f"Currently focused camera IDs: {self._choose_camera_device_ids}, "
         if self._choose_ha_device_ids:
             user_msg += f"Currently focused HA device IDs: {self._choose_ha_device_ids}, "
-        
+
         user_msg += f"Available Device information: {json.dumps(device_info)}"
         self._chat_history.add_content("user", user_msg)
 
@@ -72,7 +72,7 @@ class DeviceChooser(BaseLLMUtil):
         """Choose cameras and HA devices"""
         try:
             self._all_cameras = await self._manager.miot_service.get_miot_camera_list()
-            
+
             ha_devices_grouped = {}
             try:
                 ha_devices_grouped = await self._manager.ha_service.get_ha_devices_grouped()
@@ -98,8 +98,12 @@ class DeviceChooser(BaseLLMUtil):
             # If no condition and no location, use specific IDs or default to all cameras
             if not self._condition and not self._location:
                 if self._choose_camera_device_ids or self._choose_ha_device_ids:
-                    self._choosed_cameras = [c for c in self._all_cameras if c.did in (self._choose_camera_device_ids or [])]
-                    self._choosed_ha_devices = [d for d in self._all_ha_devices if d.did in (self._choose_ha_device_ids or [])]
+                    self._choosed_cameras = [
+                        c for c in self._all_cameras
+                        if c.did in (self._choose_camera_device_ids or [])]
+                    self._choosed_ha_devices = [
+                        d for d in self._all_ha_devices
+                        if d.did in (self._choose_ha_device_ids or [])]
                     return self._choosed_cameras, self._all_cameras, self._choosed_ha_devices, self._all_ha_devices
                 else:
                     return self._all_cameras, self._all_cameras, [], self._all_ha_devices
@@ -120,13 +124,13 @@ class DeviceChooser(BaseLLMUtil):
             ha_entity_ids = selected_ids.get("ha_device_ids", [])
 
             self._choosed_cameras = [c for c in self._all_cameras if c.did in camera_ids]
-            
+
             # Map selected HA entity IDs back to device IDs (to match manual selection)
             entity_to_device_id = {}
             for dev_id, info in ha_devices_grouped.items():
                 for entity_id in info.get("entities", []):
                     entity_to_device_id[entity_id] = dev_id
-            
+
             selected_ha_device_ids = set()
             for eid in ha_entity_ids:
                 if eid in entity_to_device_id:
@@ -134,7 +138,7 @@ class DeviceChooser(BaseLLMUtil):
                 else:
                     # Fallback: if it's already a device_id or unknown
                     selected_ha_device_ids.add(eid)
-            
+
             self._choosed_ha_devices = [d for d in self._all_ha_devices if d.did in selected_ha_device_ids]
 
             return self._choosed_cameras, self._all_cameras, self._choosed_ha_devices, self._all_ha_devices

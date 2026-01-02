@@ -3,14 +3,13 @@
  * This software may be used and distributed according to the terms of the Xiaomi Miloco License Agreement.
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Button, message } from 'antd';
 import { useTranslation } from 'react-i18next';
 import RuleForm from '@/components/RuleForm';
 import { useGlobalSocket } from '@/hooks/useGlobalSocket';
 import { useChatStore } from '@/stores/chatStore';
 import { MESSAGE_CONFIRMATION_NAME, MESSAGE_NAMESPACE, MESSAGE_TYPES } from '@/constants/messageTypes';
-import { convertFormDataToBackend } from '@/hooks/useRuleFormData';
 
 /**
  * RuleConfirmMessage Component - Rule confirm message component
@@ -32,7 +31,6 @@ const RuleConfirmMessage = React.memo(({ data, mode = 'queryEdit' }) => {
   const {
     rule,
     confirmed,
-    userSelections,
     camera_options = [],
     ha_device_options = [],
     action_options = []

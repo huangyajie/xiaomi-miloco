@@ -6,7 +6,7 @@ Trigger rule service module
 """
 
 import logging
-from typing import List, Optional, Any, Dict
+from typing import List, Optional, Any
 
 from fastapi import WebSocket
 from miot.types import MIoTCameraInfo
@@ -304,7 +304,7 @@ class TriggerRuleService:
     ) -> TriggerRuleDetail:
         """Generate trigger rule response"""
         camera_list = choose_camera_list(trigger_rule.cameras, camera_info_dict)
-        
+
         ha_device_list = []
         for did in trigger_rule.ha_devices:
             if did in ha_devices_grouped:

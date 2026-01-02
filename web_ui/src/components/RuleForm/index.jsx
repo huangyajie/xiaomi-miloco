@@ -51,7 +51,6 @@ const RuleForm = ({
   cameraOptions = [],
   haDeviceOptions: passedHaDeviceOptions = [],
   actionOptions = [],
-  enableCameraRefresh = false,
   onRefreshCameras,
   enableActionRefresh = false,
   onRefreshActions,
@@ -61,11 +60,11 @@ const RuleForm = ({
   const { t } = useTranslation();
   const [form] = Form.useForm();
   const { openModal } = useLogViewerStore();
-  const { 
-    availableMcpServices, 
-    haDeviceOptions: globalHaDeviceOptions, 
+  const {
+    availableMcpServices,
+    haDeviceOptions: globalHaDeviceOptions,
     fetchHaDeviceOptions,
-    haDeviceLoading: globalHaLoading 
+    haDeviceLoading: globalHaLoading
   } = useChatStore();
 
   const formData = useRuleFormData(initialRule);
@@ -102,7 +101,7 @@ const RuleForm = ({
       });
     }
 
-    const haOptions = passedHaDeviceOptions?.length > 0 
+    const haOptions = passedHaDeviceOptions?.length > 0
       ? passedHaDeviceOptions.map(item => ({
           label: `${item.name}${item.room_name ? ` (${item.room_name})` : ''}`,
           value: item.did,
@@ -112,12 +111,12 @@ const RuleForm = ({
 
     if (haOptions?.length > 0) {
       newOptions.push({
-        label: t('smartCenter.haDevices') || 'HA Devices', 
+        label: t('smartCenter.haDevices') || 'HA Devices',
         options: haOptions
       });
     }
     setTriggerDeviceOptions(newOptions);
-  }, [cameraOptions, passedHaDeviceOptions, globalHaDeviceOptions, t]);
+  }, [cameraOptions, passedHaDeviceOptions, globalHaDeviceOptions, t, mode]);
 
   const [checkedMcpServices, setCheckedMcpServices] = useState([]);
   const [aiRecommendExecuteType, setAiRecommendExecuteType] = useState('dynamic');
@@ -137,7 +136,7 @@ const RuleForm = ({
     }
     setAiRecommendActions(aiGeneratedActions);
     setAiRecommendExecuteType(aiGeneratedActions.length > 0 ? 'static' : 'dynamic');
-  }, [aiGeneratedActions]);
+  }, [aiGeneratedActions, mode]);
 
   useEffect(() => {
     if (mode === 'create') {
@@ -392,10 +391,12 @@ const RuleForm = ({
           options={triggerDeviceOptions}
           className={styles.select}
           dropdownRender={renderDropdownWithRefresh(
-            globalHaLoading || cameraLoading, 
-            t('common.refresh'), 
+            globalHaLoading || cameraLoading,
+            t('common.refresh'),
             async () => {
-              if (onRefreshCameras) await refreshMiotInfo(onRefreshCameras);
+              if (onRefreshCameras) {
+                await refreshMiotInfo(onRefreshCameras);
+              }
               await refreshMiotInfo(refreshHaAutomation);
               await fetchHaDeviceOptions(true);
               return { code: 0 };

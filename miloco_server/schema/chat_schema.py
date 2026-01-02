@@ -153,7 +153,8 @@ class Confirmation:
     class SaveRuleConfirm(InstructionPayload):
         rule: TriggerRuleDetail = Field(..., description="Trigger rule details")
         camera_options: List[CameraInfo] = Field(..., description="Camera option list")
-        ha_device_options: Optional[List[HADeviceInfo]] = Field(default_factory=list, description="Home Assistant device option list")
+        ha_device_options: Optional[List[HADeviceInfo]] = Field(
+            default_factory=list, description="Home Assistant device option list")
         action_options: List[Action] = Field(..., description="Action option list")
 
 

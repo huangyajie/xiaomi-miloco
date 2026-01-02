@@ -8,7 +8,7 @@ import { message } from 'antd';
 import { useChatStore, useSessionChatStore, useSocketStore } from '@/stores/chatStore';
 import { generateRequestId, createRequestMessage } from '@/utils/instruction';
 import { SOCKET_STATUS } from '@/constants/messageTypes';
-import { getMessageIsCameraImages, getMessageIsFinishChat, getMessageIsSaveRuleConfirm, getMessageIsSaveRuleConfirmResult, getMessageIsToastStream } from '@/utils/instruction/typeUtils';
+import { getMessageIsCameraImages, getMessageIsException, getMessageIsFinishChat, getMessageIsSaveRuleConfirm, getMessageIsSaveRuleConfirmResult, getMessageIsToastStream } from '@/utils/instruction/typeUtils';
 
 // global socket management hook
 export const useGlobalSocket = () => {
@@ -19,6 +19,7 @@ export const useGlobalSocket = () => {
   const {
     sessionId,
     isAnswering,
+    socketWaiting,
     setSocketStatus,
     setIsSocketActive,
     addAnswerMessage,
@@ -163,7 +164,6 @@ export const useGlobalSocket = () => {
 
           // extract camera_options and action_options from SaveRuleConfirm message
           let cameraOptionsFromConfirm = null;
-          let haDeviceOptionsFromConfirm = null;
           let actionOptionsFromConfirm = null;
           safeMessages.forEach(msg => {
             const { type, namespace, name } = msg.header;
@@ -172,9 +172,6 @@ export const useGlobalSocket = () => {
                 const payload = JSON.parse(msg.payload);
                 if (payload.camera_options) {
                   cameraOptionsFromConfirm = payload.camera_options;
-                }
-                if (payload.ha_device_options) {
-                  haDeviceOptionsFromConfirm = payload.ha_device_options;
                 }
                 if (payload.action_options) {
                   actionOptionsFromConfirm = payload.action_options;
@@ -195,14 +192,13 @@ export const useGlobalSocket = () => {
             return !shouldRemove;
           });
           let mergedMessageData = messageData;
-          if (cameraOptionsFromConfirm || actionOptionsFromConfirm || haDeviceOptionsFromConfirm) {
+          if (cameraOptionsFromConfirm || actionOptionsFromConfirm) {
 
             try {
               const currentPayload = JSON.parse(messageData.payload);
               const mergedPayload = {
                 ...currentPayload,
                 ...(cameraOptionsFromConfirm && { camera_options: cameraOptionsFromConfirm }),
-                ...(haDeviceOptionsFromConfirm && { ha_device_options: haDeviceOptionsFromConfirm }),
                 ...(actionOptionsFromConfirm && { action_options: actionOptionsFromConfirm })
               };
               mergedMessageData = {

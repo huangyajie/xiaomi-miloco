@@ -95,7 +95,8 @@ class TriggerRule(BaseModel):
 class TriggerRuleDetail(TriggerRule):
     """Trigger rule response data model, includes camera name and scene name"""
     cameras: List[CameraInfo] = Field(..., description="Camera information list, includes ID and name")
-    ha_devices: Optional[List[HADeviceInfo]] = Field(default_factory=list, description="Home Assistant device information list")
+    ha_devices: Optional[List[HADeviceInfo]] = Field(
+        default_factory=list, description="Home Assistant device information list")
     execute_info: ExecuteInfoDetail = Field(..., description="Trigger execute info details")
 
     @classmethod

@@ -107,7 +107,8 @@ class RuleCreateTool(Actor):
             notify = name
 
         try:
-            chosen_cameras, all_cameras, chosen_ha_devices, all_ha_devices = await self._choose_devices(condition, location)
+            chosen_cameras, all_cameras, chosen_ha_devices, all_ha_devices = await self._choose_devices(
+                condition, location)
             # If nothing chosen and no condition/location, default to all cameras for backward compatibility
             if not chosen_cameras and not chosen_ha_devices and not condition and not location:
                 chosen_cameras = all_cameras
@@ -215,7 +216,9 @@ class RuleCreateTool(Actor):
         return no_matched_action_descriptions, matched_actions
 
 
-    async def _choose_devices(self, condition: str, location: Optional[str] = None) -> tuple[List[CameraInfo], List[CameraInfo], List[HADeviceInfo], List[HADeviceInfo]]:
+    async def _choose_devices(
+            self, condition: str, location: Optional[str] = None
+    ) -> tuple[List[CameraInfo], List[CameraInfo], List[HADeviceInfo], List[HADeviceInfo]]:
         """Choose cameras and HA devices"""
         device_chooser = DeviceChooser(
             request_id=self._request_id,

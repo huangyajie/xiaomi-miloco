@@ -273,7 +273,7 @@ class HaService:
         try:
             res = await self._ha_proxy.ha_client.render_template_async(template)
             devices = json.loads(res)
-            
+
             # Sort devices: those with area first, then alphabetical by area and name
             sorted_items = sorted(
                 devices.items(),
@@ -283,9 +283,9 @@ class HaService:
                     (x[1].get("name") or "").lower()
                 )
             )
-            
+
             return dict(sorted_items)
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             logger.error("Failed to get grouped HA devices: %s", e)
             return {}
 
