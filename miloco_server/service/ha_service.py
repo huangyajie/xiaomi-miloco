@@ -6,6 +6,7 @@ Home Assistant service module
 """
 
 import logging
+import json
 from typing import List, Optional, Dict, Any
 
 from miloco_server.mcp.mcp_client_manager import MCPClientManager
@@ -242,6 +243,39 @@ class HaService:
             return self._HA_DOMAIN_TO_INTERNAL_ICON[state_info.domain]
         # 4. Default generic icon
         return "menuDevice"
+
+    async def get_ha_devices_grouped(self) -> Dict[str, Dict[str, Any]]:
+        """
+        Get HA devices grouped by device ID using templates.
+        Returns:
+            Dict[device_id, {name, area, entities: [entity_id]}]
+        """
+        template = """
+        {
+          {% set ns = namespace(devices=[]) %}
+          {% for state in states %}
+            {% set dev_id = device_id(state.entity_id) %}
+            {% if dev_id %}
+              {% set ns.devices = ns.devices + [dev_id] %}
+            {% endif %}
+          {% endfor %}
+          {% set unique_devices = ns.devices | unique | list %}
+          
+          {% for dev_id in unique_devices %}
+            "{{ dev_id }}": {
+               "name": {{ (device_attr(dev_id, 'name_by_user') or device_attr(dev_id, 'name') or dev_id) | to_json }},
+               "area": {{ (area_name(dev_id) or '') | to_json }},
+               "entities": {{ device_entities(dev_id) | list | to_json }}
+            }{% if not loop.last %},{% endif %}
+          {% endfor %}
+        }
+        """
+        try:
+            res = await self._ha_proxy.ha_client.render_template_async(template)
+            return json.loads(res)
+        except Exception as e:
+            logger.error("Failed to get grouped HA devices: %s", e)
+            return {}
 
     async def get_ha_device_list(self) -> List[HADeviceInfo]:
         """Get Home Assistant device list"""

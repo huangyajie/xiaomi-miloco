@@ -119,6 +119,18 @@ async def get_ha_device_list(current_user: str = Depends(verify_token)):
     )
 
 
+@router.get(path="/devices_grouped", summary="Get Home Assistant devices grouped by ID", response_model=NormalResponse)
+async def get_ha_devices_grouped(current_user: str = Depends(verify_token)):
+    """Get Home Assistant devices grouped"""
+    logger.info("Get HA devices grouped API called, user: %s", current_user)
+    
+    data = await manager.ha_service.get_ha_devices_grouped()
+    return NormalResponse(
+        code=0,
+        message="Home Assistant grouped devices retrieved successfully",
+        data=data
+    )
+
 @router.post(path="/control", summary="Control Home Assistant device", response_model=NormalResponse)
 async def control_ha_device(control_req: HAControlRequest, current_user: str = Depends(verify_token)):
     """Control Home Assistant device"""

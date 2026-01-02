@@ -7,6 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { Select, Input, Button, Checkbox, Form, Tooltip, Spin, message, Switch } from 'antd';
 import { QuestionCircleOutlined, ReloadOutlined, UpOutlined, DownOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
+import { getHaDevicesGrouped, refreshHaAutomation } from '@/api';
 import TimeSelector from '@/components/TimeSelector';
 import {
   TRIGGER_PERIOD_OPTIONS,
@@ -74,6 +75,54 @@ const RuleForm = ({
   const [sendNotification, setSendNotification] = useState(false);
   const [notificationText, setNotificationText] = useState('');
 
+  const [haDeviceOptions, setHaDeviceOptions] = useState([]);
+  const [haLoading, setHaLoading] = useState(false);
+  const [triggerDeviceOptions, setTriggerDeviceOptions] = useState([]);
+
+  const fetchHaDevices = async () => {
+    setHaLoading(true);
+    try {
+      const res = await getHaDevicesGrouped();
+      if (res?.code === 0) {
+        const devices = res.data || {};
+        const options = Object.entries(devices).map(([id, info]) => ({
+          label: `${info.name}${info.area ? ` (${info.area})` : ''}`,
+          value: id
+        }));
+        setHaDeviceOptions(options);
+      }
+    } catch (error) {
+      console.error('Failed to fetch HA devices:', error);
+    } finally {
+      setHaLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchHaDevices();
+  }, []);
+
+  useEffect(() => {
+    const newOptions = [];
+    if (cameraOptions?.length > 0) {
+      newOptions.push({
+        label: t('smartCenter.cameras'),
+        options: cameraOptions.map(item => ({
+          label: `${item.name}(${item.room_name || ''})`,
+          value: item.did,
+          _type: 'camera'
+        }))
+      });
+    }
+    if (haDeviceOptions?.length > 0) {
+      newOptions.push({
+        label: t('smartCenter.haDevices') || 'HA Devices', 
+        options: haDeviceOptions.map(opt => ({...opt, _type: 'ha'}))
+      });
+    }
+    setTriggerDeviceOptions(newOptions);
+  }, [cameraOptions, haDeviceOptions, t]);
+
   const [checkedMcpServices, setCheckedMcpServices] = useState([]);
   const [aiRecommendExecuteType, setAiRecommendExecuteType] = useState('dynamic');
   const [aiRecommendActionDescriptions, setAiRecommendActionDescriptions] = useState([]);
@@ -99,12 +148,15 @@ const RuleForm = ({
       setAiGeneratedActions([]);
     }
     if (mode !== 'create' && formData) {
+      const cameras = formData.cameras?.map(camera =>
+        typeof camera === 'object' ? camera.did : camera
+      ) || [];
+      const ha_devices = formData.ha_devices || [];
+
       form.setFieldsValue({
         name: formData.name,
         condition: formData.condition,
-        cameras: formData.cameras?.map(camera =>
-          typeof camera === 'object' ? camera.did : camera
-        ) || [],
+        trigger_devices: [...cameras, ...ha_devices],
       });
 
       if (initialSelectedKeys && initialSelectedKeys.length > 0) {
@@ -235,13 +287,34 @@ const RuleForm = ({
         introduction: action.introduction || '',
       }));
 
-    const cameras = values.cameras.map(did => {
-      const camera = cameraOptions.find(c => c.did === did);
-      return camera || did;
+    // Split trigger_devices into cameras and ha_devices
+    const selectedDevices = values.trigger_devices || [];
+    const cameras = [];
+    const ha_devices = [];
+
+    // Helper to check if ID is camera or HA
+    const isCamera = (id) => cameraOptions.some(c => c.did === id);
+    const isHaDevice = (id) => haDeviceOptions.some(d => d.value === id);
+
+    selectedDevices.forEach(id => {
+      if (isCamera(id)) {
+        const camera = cameraOptions.find(c => c.did === id);
+        cameras.push(camera || id);
+      } else if (isHaDevice(id)) {
+        ha_devices.push(id);
+      } else {
+        // Fallback: Check suffix or assume camera
+        // If we can't find it in options (e.g. offline device), we might have trouble.
+        // However, usually camera DIDs are numeric strings, HA IDs are strings.
+        // Let's assume camera if not found, to match original logic.
+        cameras.push(id);
+      }
     });
+
     const formData = {
       name: values.name,
       cameras,
+      ha_devices,
       condition: values.condition,
       automation_actions,
       ai_recommend_execute_type: aiRecommendExecuteType,
@@ -289,7 +362,7 @@ const RuleForm = ({
   };
 
   const handleFormValuesChange = (changedValues, allValues) => {
-    if ('cameras' in changedValues) {
+    if ('trigger_devices' in changedValues) {
       setAiRecommendActions([]);
       setAiRecommendExecuteType('dynamic');
     }
@@ -312,24 +385,27 @@ const RuleForm = ({
 
       <Form.Item
         className={styles.customFormLabel}
-        label={t('smartCenter.selectCameras')}
-        name="cameras"
-        rules={[{ required: true, message: t('smartCenter.pleaseSelectCameras') }]}
+        label={t('smartCenter.selectTriggerDevices')}
+        name="trigger_devices"
+        rules={[{ required: true, message: t('smartCenter.pleaseSelectTriggerDevices') }]}
       >
         <Select
           mode="multiple"
           allowClear
-          placeholder={t('smartCenter.pleaseSelectCameras')}
+          placeholder={t('smartCenter.pleaseSelectTriggerDevices')}
           disabled={isSubmitDisabled}
-          options={cameraOptions?.map?.(item => ({
-            label: `${item.name}(${item.room_name || ''})`,
-            value: item.did
-          }))}
+          options={triggerDeviceOptions}
           className={styles.select}
-          dropdownRender={enableCameraRefresh && onRefreshCameras
-            ? renderDropdownWithRefresh(cameraLoading, t('smartCenter.refreshCameras'), onRefreshCameras)
-            : undefined
-          }
+          dropdownRender={renderDropdownWithRefresh(
+            haLoading || cameraLoading, 
+            t('common.refresh'), 
+            async () => {
+              if (onRefreshCameras) await refreshMiotInfo(onRefreshCameras);
+              await refreshMiotInfo(refreshHaAutomation);
+              await fetchHaDevices();
+              return { code: 0 };
+            }
+          )}
         />
       </Form.Item>
 

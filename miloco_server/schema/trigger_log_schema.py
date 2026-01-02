@@ -16,7 +16,7 @@ from miloco_server.schema.trigger_schema import Action, ExecuteType, Notify
 
 class TriggerConditionResult(BaseModel):
     """Trigger condition result data model"""
-    camera_info: CameraInfo = Field(..., description="Camera information")
+    camera_info: Optional[CameraInfo] = Field(None, description="Camera information")
     channel: int = Field(..., description="Channel number")
     result: bool = Field(..., description="Result")
     images: Optional[list[CameraImgInfoPath]] = Field(None, description="Image sequence path")

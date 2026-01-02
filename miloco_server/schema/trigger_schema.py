@@ -86,6 +86,7 @@ class TriggerRule(BaseModel):
     enabled: bool = Field(True, description="Whether enabled")
     name: str = Field(..., description="Rule name")
     cameras: List[str] = Field(..., description="Camera device ID list")
+    ha_devices: Optional[List[str]] = Field(default_factory=list, description="Home Assistant device ID list")
     condition: str = Field(..., description="Trigger condition")
     execute_info: ExecuteInfo = Field(..., description="Trigger execute info")
     filter: Optional[TriggerFilter] = Field(None, description="Trigger filter")
