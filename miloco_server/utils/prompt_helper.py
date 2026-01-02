@@ -56,23 +56,23 @@ class TriggerRuleConditionPromptBuilder:
             current_time_str = datetime.now(timezone.utc).isoformat()
             state_text = f"\nCurrent System Time: {current_time_str}\n\nCurrent Device States:\n"
             for entity_id, state_info in device_states.items():
-                state_val = state_info.get('state', 'unknown')
-                attributes = state_info.get('attributes', {})
-                friendly_name = attributes.get('friendly_name', entity_id)
-                
+                state_val = state_info.get("state", "unknown")
+                attributes = state_info.get("attributes", {})
+                friendly_name = attributes.get("friendly_name", entity_id)
+
                 # Format attributes as a compact string, excluding generic ones
-                ignored_attrs = {'friendly_name', 'icon', 'entity_picture', 'supported_features', 'context'}
+                ignored_attrs = {"friendly_name", "icon", "entity_picture", "supported_features", "context"}
                 attr_str = ", ".join([f"{k}={v}" for k, v in attributes.items() if k not in ignored_attrs])
-                
+
                 # Check if this is the triggering entity
-                is_source = state_info.get('_is_trigger_source', False)
+                is_source = state_info.get("_is_trigger_source", False)
                 source_tag = " [TRIGGER SOURCE]" if is_source else ""
-                
+
                 state_text += f"- {friendly_name} ({entity_id}){source_tag}: State={state_val}"
                 if attr_str:
                     state_text += f", Attributes=[{attr_str}]"
                 state_text += "\n"
-            
+
             user_content.append({
                 "type": "text",
                 "text": state_text

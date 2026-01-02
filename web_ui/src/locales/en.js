@@ -198,7 +198,6 @@ export default {
     triggerIntervalDescription: 'Set the minimum trigger interval time for the rule',
     addRule: 'Add Rule',
     createRule: 'Create New Rule',
-    cameras: 'Cameras',
     noCameras: 'None',
     miHomeAutomationExecution: 'Xiaomi Home Automation',
     haAutomationExecution: 'HA Automation',

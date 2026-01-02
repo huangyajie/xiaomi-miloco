@@ -182,7 +182,7 @@ class SQLiteConnector:
         if "ha_devices" not in columns:
             logger.info("Adding ha_devices column to trigger_rule table")
             cursor.execute("ALTER TABLE trigger_rule ADD COLUMN ha_devices TEXT")
-        
+
         conn.commit()
 
     def _create_model_vendor_table(self, conn: sqlite3.Connection) -> None:

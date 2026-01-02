@@ -200,7 +200,6 @@ export default {
     triggerIntervalDescription: '设置规则的最小触发间隔时间',
     addRule: '添加规则',
     createRule: '创建新规则',
-    cameras: '摄像头',
     noCameras: '无',
     miHomeAutomationExecution: '米家自动化',
     haAutomationExecution: 'HA自动化',

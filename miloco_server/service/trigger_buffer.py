@@ -16,12 +16,12 @@ logger = logging.getLogger(__name__)
 class TriggerBuffer:
     """
     Trigger Buffer with Source Tracking.
-    
+
     Accumulates rule IDs and the specific entities that triggered them.
     """
 
-    def __init__(self, 
-                 execute_callback: Callable[[Dict[str, Set[str]]], Any], 
+    def __init__(self,
+                 execute_callback: Callable[[Dict[str, Set[str]]], Any],
                  debounce_seconds: float = 1.0):
         """
         Args:
@@ -29,7 +29,7 @@ class TriggerBuffer:
         """
         self._execute_callback = execute_callback
         self._debounce_seconds = debounce_seconds
-        
+
         # rule_id -> set of entities that triggered it in this window
         self._dirty_rules: Dict[str, Set[str]] = {}
         self._timer_task: Optional[asyncio.Task] = None
@@ -47,29 +47,29 @@ class TriggerBuffer:
                 if rid not in self._dirty_rules:
                     self._dirty_rules[rid] = set()
                 self._dirty_rules[rid].add(entity_id)
-            
+
             logger.debug("Rules marked dirty by entity %s: %s", entity_id, rule_ids)
-            
+
             # Reset timer
             if self._timer_task:
                 self._timer_task.cancel()
-            
+
             self._timer_task = asyncio.create_task(self._flush_after_delay())
 
     async def _flush_after_delay(self):
         try:
             await asyncio.sleep(self._debounce_seconds)
-            
+
             async with self._lock:
                 work_load = self._dirty_rules.copy()
                 self._dirty_rules.clear()
                 self._timer_task = None
-            
+
             if work_load:
                 logger.info("TriggerBuffer flushing %d rules", len(work_load))
                 await self._execute_callback(work_load)
 
         except asyncio.CancelledError:
             pass
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             logger.error("Error in TriggerBuffer flush: %s", e)
