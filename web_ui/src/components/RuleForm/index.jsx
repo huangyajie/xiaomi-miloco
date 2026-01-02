@@ -64,7 +64,8 @@ const RuleForm = ({
     availableMcpServices,
     haDeviceOptions: globalHaDeviceOptions,
     fetchHaDeviceOptions,
-    haDeviceLoading: globalHaLoading
+    haDeviceLoading: globalHaLoading,
+    haDeviceFetched: globalHaFetched
   } = useChatStore();
 
   const formData = useRuleFormData(initialRule);
@@ -83,10 +84,10 @@ const RuleForm = ({
   const [triggerDeviceOptions, setTriggerDeviceOptions] = useState([]);
 
   useEffect(() => {
-    if (passedHaDeviceOptions?.length === 0) {
+    if (passedHaDeviceOptions?.length === 0 && !globalHaFetched) {
       fetchHaDeviceOptions();
     }
-  }, [passedHaDeviceOptions, fetchHaDeviceOptions]);
+  }, [passedHaDeviceOptions, fetchHaDeviceOptions, globalHaFetched]);
 
   useEffect(() => {
     const newOptions = [];

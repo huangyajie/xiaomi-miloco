@@ -250,6 +250,10 @@ class HaService:
         Returns:
             Dict[device_id, {name, area, entities: [entity_id]}]
         """
+        if not self.ha_client:
+            logger.debug("HA client not initialized, skipping get_ha_devices_grouped")
+            return {}
+
         template = """
         {
           {% set ns = namespace(devices=[]) %}
