@@ -44,6 +44,10 @@ instace.interceptors.response.use(
       }
     }
     if (err?.response?.status === 500) {
+      const url = err?.config?.url || '';
+      if (typeof url === 'string' && url.includes('/api/model/get_cuda_info')) {
+        return null;
+      }
       window.location.href = `${origin}/500`;
     }
 
