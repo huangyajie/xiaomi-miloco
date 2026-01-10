@@ -24,10 +24,21 @@ const detectCodec = (data) => {
       ((data[i + 2] === 0x00 && data[i + 3] === 0x01) || data[i + 2] === 0x01)
     ) {
       const nalStart = data[i + 2] === 0x01 ? i + 3 : i + 4;
-      const h264Type = data[nalStart] & 0x1f;
-      const h265Type = (data[nalStart] >> 1) & 0x3f;
-      if ([5, 7, 8].includes(h264Type)) {return 'h264';}
-      if ([32, 33, 34, 19, 20].includes(h265Type)) {return 'h265';}
+      const byte = data[nalStart];
+      const h264Type = byte & 0x1f;
+      // H.265 Type is bits 1-6. Bit 0 must be 0 for LayerId=0 (Base layer).
+      // Also Bit 7 (Forbidden) must be 0.
+      const isH265Candidate = (byte & 0x81) === 0;
+      const h265Type = (byte >> 1) & 0x3f;
+
+      if ([5, 7, 8].includes(h264Type)) {
+          console.log(`Detected H.264: Byte=${byte.toString(16)}, Type=${h264Type}`);
+          return 'h264';
+      }
+      if (isH265Candidate && [32, 33, 34, 19, 20].includes(h265Type)) {
+          console.log(`Detected H.265: Byte=${byte.toString(16)}, Type=${h265Type}`);
+          return 'h265';
+      }
     }
     i++;
   }
@@ -52,11 +63,11 @@ const VideoPlayer = ({ codec = 'avc1.42E01E', poster, style, cameraId, channel, 
   const canvasRef = useRef(null)
   const wsRef = useRef(null)
   const decoderRef = useRef(null)
+  const detectedCodecRef = useRef(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [show, setShow] = useState(false)
   const [isSupported, setIsSupported] = useState(null)
-  const [autoCodec, setAutoCodec] = useState(null);
 
   // detect WebCodecs support
   useEffect(() => {
@@ -100,6 +111,13 @@ const VideoPlayer = ({ codec = 'avc1.42E01E', poster, style, cameraId, channel, 
   }, [])
 
   /**
+   * Helper to convert byte to hex string
+   */
+  const toHex = (v) => {
+    return v.toString(16).padStart(2, '0').toUpperCase();
+  }
+
+  /**
    * Check if the data is a key frame
    * @param {Uint8Array} data - Binary video data
    * @param {string} codec - Video codec format
@@ -115,7 +133,10 @@ const VideoPlayer = ({ codec = 'avc1.42E01E', poster, style, cameraId, channel, 
           ((data[i + 2] === 0x00 && data[i + 3] === 0x01) || data[i + 2] === 0x01)
         ) {
           const nalUnitType = data[i + 2] === 0x01 ? data[i + 3] & 0x1f : data[i + 4] & 0x1f;
-          return nalUnitType === 5;
+          // SPS(7), PPS(8), IDR(5) are all critical for decoding start
+          if (nalUnitType === 5 || nalUnitType === 7 || nalUnitType === 8) {
+            return true;
+          }
         }
         i++;
       }
@@ -147,6 +168,32 @@ const VideoPlayer = ({ codec = 'avc1.42E01E', poster, style, cameraId, channel, 
   }, [onCanvasRef, show])
 
   useEffect(() => {
+    /**
+     * Parse SPS to get H.264 codec string
+     * @param {Uint8Array} data
+     * @returns {string|null}
+     */
+    const getH264CodecString = (data) => {
+      let i = 0;
+      while (i < data.length - 4) {
+        if (
+          data[i] === 0x00 && data[i + 1] === 0x00 &&
+          ((data[i + 2] === 0x00 && data[i + 3] === 0x01) || data[i + 2] === 0x01)
+        ) {
+          const nalStart = data[i + 2] === 0x01 ? i + 3 : i + 4;
+          const nalUnitType = data[nalStart] & 0x1f;
+          if (nalUnitType === 7) { // SPS
+            const profileIdc = data[nalStart + 1];
+            const constraintSet = data[nalStart + 2];
+            const levelIdc = data[nalStart + 3];
+            return `avc1.${toHex(profileIdc)}${toHex(constraintSet)}${toHex(levelIdc)}`;
+          }
+        }
+        i++;
+      }
+      return null;
+    }
+
     const init = async () => {
       if (!cameraId || isSupported === null) {return} // wait for support detection to complete
 
@@ -236,7 +283,8 @@ const VideoPlayer = ({ codec = 'avc1.42E01E', poster, style, cameraId, channel, 
             }
           })
         },
-        error: () => {
+        error: (e) => {
+          console.error('VideoDecoder error:', e);
           setError(t('instant.deviceList.deviceDecodeFailed'))
           message.error(t('instant.deviceList.deviceDecodeFailed'))
         }
@@ -245,16 +293,55 @@ const VideoPlayer = ({ codec = 'avc1.42E01E', poster, style, cameraId, channel, 
         codec,
         hardwareAcceleration: 'prefer-hardware',
       })
+
+      let lastConfiguredCodec = codec;
+
       wsRef.current.onmessage = e => {
         if (e.data instanceof ArrayBuffer) {
           const uint8 = new Uint8Array(e.data);
-          if (!autoCodec) {
+          let currentCodec = detectedCodecRef.current;
+
+          if (!currentCodec) {
             const detected = detectCodec(uint8);
             if (detected !== 'unknown') {
-              setAutoCodec(detected === 'h264' ? 'avc1.42E01E' : 'hvc1.1.6.L93.B0');
+              console.log('Initial codec detection:', detected);
+              if (detected === 'h264') {
+                const spsCodec = getH264CodecString(uint8);
+                currentCodec = spsCodec || 'avc1.640028';
+              } else {
+                currentCodec = 'hev1.1.6.L93.B0'; // Use hev1 for Annex-B
+              }
+              detectedCodecRef.current = currentCodec;
             }
           }
-          const useCodec = autoCodec || codec;
+
+          // Try to update H.264 codec from SPS if it was using default or we find a new one
+          if (currentCodec && currentCodec.startsWith('avc1')) {
+             const spsCodec = getH264CodecString(uint8);
+             if (spsCodec && spsCodec !== currentCodec) {
+                console.log(`Updating H.264 codec from SPS: ${currentCodec} -> ${spsCodec}`);
+                currentCodec = spsCodec;
+                detectedCodecRef.current = currentCodec;
+             }
+          }
+
+          const useCodec = currentCodec || codec;
+
+          // Reconfigure if codec changed
+          if (useCodec !== lastConfiguredCodec && decoderRef.current && decoderRef.current.state !== 'closed') {
+            try {
+              console.log('Configuring decoder with codec:', useCodec);
+              decoderRef.current.configure({
+                codec: useCodec,
+                hardwareAcceleration: 'prefer-hardware',
+              });
+              lastConfiguredCodec = useCodec;
+              decoderRef.current._waitForKeyFrame = true; // Need new keyframe after re-config
+            } catch (configError) {
+              console.error('Decoder configuration failed:', configError);
+            }
+          }
+
           if (decoderRef.current._waitForKeyFrame === undefined) {
             decoderRef.current._waitForKeyFrame = true;
           }
@@ -264,9 +351,11 @@ const VideoPlayer = ({ codec = 'avc1.42E01E', poster, style, cameraId, channel, 
             if (!isKey) {
               return;
             } else {
+              console.log('Keyframe found, starting decode');
               decoderRef.current._waitForKeyFrame = false;
             }
           }
+
           try {
             decoderRef.current.decode(new EncodedVideoChunk({
               type: isKey ? 'key' : 'delta',
@@ -274,6 +363,7 @@ const VideoPlayer = ({ codec = 'avc1.42E01E', poster, style, cameraId, channel, 
               data: uint8
             }))
           } catch (err) {
+            console.error('Decode error:', err);
             setError(t('instant.deviceList.deviceDecodeFailed'))
           }
         }
@@ -300,7 +390,8 @@ const VideoPlayer = ({ codec = 'avc1.42E01E', poster, style, cameraId, channel, 
         decoderRef.current = null;
       }
     }
-  }, [codec, isSupported, cameraId, channel])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [codec, isSupported, cameraId, channel, onCanvasRef, t])
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', ...style }}>
