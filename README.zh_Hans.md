@@ -1,4 +1,8 @@
-# Xiaomi Miloco
+# Xiaomi Miloco (Personal Fork)
+
+> **🚀 个人维护版说明**
+> 本分支是由开发者个人维护的活跃版本，致力于更快的特性迭代和问题修复。
+> **主要增强：** 全面支持 Home Assistant 接入、RTSP 摄像头集成以及 macOS (MPS) 加速。
 
 智能家居未来探索方案 **Xiaomi Local Copilot** ，以米家摄像机为视觉信息来源，以自研大模型为核心，打通全屋 IoT 设备。基于大模型的开发范式，让用户能够以自然语言定义家庭的各种需求和规则，实现更广泛、更具创意的智能联动。
 
@@ -10,13 +14,25 @@
 
 ## 最新动态
 
-- [2025-11] Xiaomi Miloco 整体框架开源
+- **[2026-01] v0.15 发布**：支持 Home Assistant 设备作为自动化规则的触发源。
+- **[2025-12] v0.14 发布**：增加对 Home Assistant (HA) 设备的全面支持。
+- **[2025-12] v0.13 发布**：
+  - 支持集成第三方 RTSP 摄像头。
+  - 为小米摄像头提供 RTSP 服务能力。
+  - AI 引擎增加对 macOS (MPS) 硬件加速的支持。
+- [2025-11] Xiaomi Miloco 整体框架开源（官方）
+
+## Blog
+
+为了帮助用户深入了解本项目的新版本的功能介绍，我开设了专栏进行介绍：
+
+👉 **[AI 技术专栏 - Xiaomi Miloco Blog](https://blog.csdn.net/h893529689/category_12799372.html)**
 
 ## 关键特性
 
 1. **交互新范式**：基于大模型的开发范式，通过自然语言交互就可以完成规则设置、设备的复杂指令控制。
-2. **视觉数据新用途**：以摄像头数据流作为感知信息源，使用大模型将视觉数据包含的各种家庭场景事件解析出来，用于回复用户 Query。
-3. **端侧大模型**：将家庭场景任务拆分规划+视觉理解两个阶段，提供小米自研端侧模型，实现端侧视频理解，保障家庭隐私安全。
+2. **端侧大模型**：将家庭场景任务拆分规划+视觉理解两个阶段，提供小米自研端侧模型[Xiaomi MiMo-VL-Miloco-7B](https://github.com/XiaoMi/xiaomi-mimo-vl-miloco)，实现端侧视频理解，保障家庭隐私安全。
+3. **视觉数据新用途**：以摄像头数据流作为感知信息源，使用大模型将视觉数据包含的各种家庭场景事件解析出来，用于回复用户 Query。
 4. **米家生态**：打通米家生态，支持米家设备、米家场景的获取与执行，支持自定义内容发送米家通知。
 
     <img src="assets/images/ai_center_cn.jpg" width="60%" />
@@ -90,11 +106,10 @@ bash scripts/install.sh
 ### 技术交流讨论
 
 - GitHub 的[讨论区](https://github.com/XiaoMi/xiaomi-miloco/discussions/)
-- 项目讨论群（微信）：
+- 项目讨论群（微信、飞书）：
 
-  <img src="assets/images/miloco_wechat_group_17.jpeg" width="30%" />
-  <img src="assets/images/miloco_wechat_15.jpeg" width="30%" />
-  <img src="assets/images/miloco_wechat_group_12.jpeg" width="30%" />
+  <img src="assets/images/miloco_feishu.jpeg" width="45%" />
+  <img src="assets/images/miloco_wechat_18.jpeg" width="45%" />
 
 
 ### 加入我们

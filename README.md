@@ -1,4 +1,8 @@
-# Xiaomi Miloco
+# Xiaomi Miloco (Personal Fork)
+
+> **🚀 Personal Fork Note**
+> This branch is an actively maintained version by the developer, dedicated to faster feature iterations and bug fixes.
+> **Key Enhancements:** Full support for Home Assistant integration, RTSP camera support, and macOS (MPS) acceleration.
 
 **Xiaomi Local Copilot** is a future exploration solution for smart homes. Using Xiaomi Home cameras as the source of visual information and a self-developed LLM as its core, it connects all IoT devices throughout the house. Based on the development paradigm of LLM, it enables users to define various family needs and rules in natural language, achieving broader and more creative smart device integration.
 
@@ -10,13 +14,25 @@ English | [简体中文](README.zh_Hans.md)
 
 ## News
 
-- [2025-11] Xiaomi Miloco Framework Open Source
+- **[2026-01] v0.15 Released**: Supports Home Assistant devices as triggers for automation rules.
+- **[2025-12] v0.14 Released**: Added comprehensive support for Home Assistant (HA) devices.
+- **[2025-12] v0.13 Released**:
+  - Support for integrating third-party RTSP cameras.
+  - Provides RTSP service capability for Xiaomi cameras.
+  - Added macOS (MPS) hardware acceleration support for AI engine.
+- [2025-11] Xiaomi Miloco Framework Open Source (Official)
+
+## Blog
+
+To help users gain a deeper understanding of the new features in this project, I have created a dedicated column for introduction:
+
+👉 **[AI Technical Column - Xiaomi Miloco Blog](https://blog.csdn.net/h893529689/category_12799372.html)**
 
 ## Key Features
 
 1. New Interaction Paradigm: Based on the development paradigm of LLM, rule-setting and complex device command control can be completed through natural language interaction.
-2. New Use for Visual Data: Using camera data streams as a source of perceptual information, the LLM is used to analyze various home scene events contained in the visual data to respond to user queries.
-3. On-Device LLM: The home scene tasks are split into two stages: planning and visual understanding. It provides Xiaomi's self-developed on-device model to realize on-device video understanding and ensure family privacy and security.
+2. On-Device LLM: The home scene tasks are split into two stages: planning and visual understanding. It provides Xiaomi's self-developed on-device model[Xiaomi MiMo-VL-Miloco-7B](https://github.com/XiaoMi/xiaomi-mimo-vl-miloco)to realize on-device video understanding and ensure family privacy and security.
+3. New Use for Visual Data: Using camera data streams as a source of perceptual information, the LLM is used to analyze various home scene events contained in the visual data to respond to user queries.
 4. Xiaomi Home Ecosystem: It connects with the Xiaomi Home ecosystem, supports the retrieval and execution of Mi Home devices and scenes, and supports sending customized content for Xiao Home notifications.
 
     <img src="assets/images/ai_center.jpg" width="60%" />
@@ -91,11 +107,10 @@ For issue reporting, please participate through the following methods:
 ### Technical Discussion
 
 - GitHub [Discussions](https://github.com/XiaoMi/xiaomi-miloco/discussions/)
-- Project Discussion Group (WeChat):
+- Project Discussion Group (WeChat、Lark):
 
-  <img src="assets/images/miloco_wechat_group_17.jpeg" width="30%" />
-  <img src="assets/images/miloco_wechat_15.jpeg" width="30%" />
-  <img src="assets/images/miloco_wechat_group_12.jpeg" width="30%" />
+  <img src="assets/images/miloco_feishu.jpeg" width="45%" />
+  <img src="assets/images/miloco_wechat_18.jpeg" width="45%" />
 
 
 
