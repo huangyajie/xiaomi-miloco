@@ -1,4 +1,8 @@
-# Xiaomi Miloco
+# Xiaomi Miloco (Personal Fork)
+
+> **🚀 Personal Fork Note**
+> This branch is an actively maintained version by the developer, dedicated to faster feature iterations and bug fixes.
+> **Key Enhancements:** Full support for Home Assistant integration, RTSP camera support, and macOS (MPS) acceleration.
 
 **Xiaomi Local Copilot** is a future exploration solution for smart homes. Using Xiaomi Home cameras as the source of visual information and a self-developed LLM as its core, it connects all IoT devices throughout the house. Based on the development paradigm of LLM, it enables users to define various family needs and rules in natural language, achieving broader and more creative smart device integration.
 
@@ -10,7 +14,19 @@ English | [简体中文](README.zh_Hans.md)
 
 ## News
 
-- [2025-11] Xiaomi Miloco Framework Open Source
+- **[2026-01] v0.15 Released**: Supports Home Assistant devices as triggers for automation rules.
+- **[2025-12] v0.14 Released**: Added comprehensive support for Home Assistant (HA) devices.
+- **[2025-12] v0.13 Released**:
+  - Support for integrating third-party RTSP cameras.
+  - Provides RTSP service capability for Xiaomi cameras.
+  - Added macOS (MPS) hardware acceleration support for AI engine.
+- [2025-11] Xiaomi Miloco Framework Open Source (Official)
+
+## Blog
+
+To help users gain a deeper understanding of the new features in this project, I have created a dedicated column for introduction:
+
+👉 **[AI Technical Column - Xiaomi Miloco Blog](https://blog.csdn.net/h893529689/category_12799372.html)**
 
 ## Key Features
 
