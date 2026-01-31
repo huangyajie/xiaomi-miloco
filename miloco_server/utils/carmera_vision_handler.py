@@ -16,7 +16,7 @@ from typing import Any, Callable, Coroutine, List
 
 from miloco_server.schema.miot_schema import CameraImgInfo, CameraImgSeq, CameraInfo
 from miot.camera import MIoTCameraInstance
-from miot.types import MIoTCameraInfo
+from miot.types import MIoTCameraInfo, MIoTCameraCodec
 from miot.rtsp_camera import RTSPCameraInstance, RtspCameraInfo
 
 logger = logging.getLogger(__name__)
@@ -208,7 +208,7 @@ class RTSPEnabledCameraVisionHandler(CameraVisionHandler):
         self._last_audio_ts_ms = 0
         self._audio_seq = 0
         self._audio_resample_state = None
-        self._rtsp_audio_codec = 1027  # G711A
+        self._rtsp_audio_codec = 0
 
         # Call parent constructor
         super().__init__(camera_info, miot_camera_instance, max_size, ttl)
@@ -241,6 +241,61 @@ class RTSPEnabledCameraVisionHandler(CameraVisionHandler):
 
     async def _register_rtsp_forwarding(self):
         """Register a callback to forward video frames to RTSP server."""
+        async def handle_audio(
+            data: bytes,
+            codec: MIoTCameraCodec | None = None,
+            is_pcm: bool = False,
+        ) -> None:
+            if not data or not self._rtsp_server:
+                return
+
+            if is_pcm:
+                # OPUS decoded PCM path -> transcode to G711A
+                if self._rtsp_audio_codec == 0:
+                    self._rtsp_audio_codec = 1027
+                if not self._stream_added:
+                    self._try_add_stream()
+                    if not self._stream_added:
+                        return
+
+                # MIoT decoder outputs 16kHz mono s16 PCM; downsample to 8kHz for G711A.
+                pcm_8k, self._audio_resample_state = audioop.ratecv(
+                    data, 2, 1, 16000, 8000, self._audio_resample_state
+                )
+                alaw = audioop.lin2alaw(pcm_8k, 2)
+                if not alaw:
+                    return
+
+                audio_payload = alaw
+                self._rtsp_audio_codec = 1027
+            else:
+                if codec == MIoTCameraCodec.AUDIO_G711A:
+                    self._rtsp_audio_codec = 1027
+                elif codec == MIoTCameraCodec.AUDIO_G711U:
+                    self._rtsp_audio_codec = 1026
+                else:
+                    return
+                audio_payload = data
+
+                if not self._stream_added:
+                    self._try_add_stream()
+                    if not self._stream_added:
+                        return
+
+            if self._last_audio_ts_ms == 0:
+                self._last_audio_ts_ms = int(time.time() * 1000)
+            else:
+                self._last_audio_ts_ms += int(len(audio_payload) * 1000 / 8000)
+            self._audio_seq += 1
+            self._rtsp_server.push_frame(
+                self.camera_info.did,
+                self._rtsp_audio_codec,
+                audio_payload,
+                self._last_audio_ts_ms,
+                self._audio_seq,
+                0
+            )
+
         async def on_video(did: str, data: bytes, ts: int, seq: int, channel: int):  # pylint: disable=unused-argument
             # Detect video codec from data
             codec_id = self._detect_codec_from_data(data)
@@ -266,32 +321,20 @@ class RTSPEnabledCameraVisionHandler(CameraVisionHandler):
                     frame_type = 1 if self._is_i_frame(data) else 0
                     self._rtsp_server.push_frame(did, self._detected_video_codec, data, ts, seq, frame_type)
 
+        async def on_raw_audio(did: str, data: bytes, ts: int, seq: int, channel: int):  # pylint: disable=unused-argument
+            codec = self.miot_camera_instance.get_last_audio_codec(channel)
+            await handle_audio(data, codec=codec, is_pcm=False)
+
         async def on_pcm(did: str, data: bytes, ts: int, channel: int):  # pylint: disable=unused-argument
-            if not data or not self._rtsp_server:
-                return
-            if not self._stream_added:
-                self._try_add_stream()
-                if not self._stream_added:
-                    return
-
-            # MIoT decoder outputs 16kHz mono s16 PCM; downsample to 8kHz for G711A.
-            pcm_8k, self._audio_resample_state = audioop.ratecv(
-                data, 2, 1, 16000, 8000, self._audio_resample_state
-            )
-            alaw = audioop.lin2alaw(pcm_8k, 2)
-            if not alaw:
-                return
-
-            if self._last_audio_ts_ms == 0:
-                self._last_audio_ts_ms = int(time.time() * 1000)
-            else:
-                self._last_audio_ts_ms += int(len(alaw) * 1000 / 8000)
-            self._audio_seq += 1
-            self._rtsp_server.push_frame(did, self._rtsp_audio_codec, alaw, self._last_audio_ts_ms, self._audio_seq, 0)
+            await handle_audio(data, is_pcm=True)
 
         # Register video callback
         self._rtsp_reg_id = await self.miot_camera_instance.register_raw_video_async(on_video, multi_reg=True)
-        # Register PCM decode callback for audio transcoding
+        # Register raw audio for G711 passthrough
+        self._rtsp_raw_audio_reg_id = await self.miot_camera_instance.register_raw_audio_async(
+            on_raw_audio, multi_reg=True
+        )
+        # Register PCM decode callback for OPUS transcoding
         self._rtsp_audio_reg_id = await self.miot_camera_instance.register_decode_pcm_async(on_pcm, multi_reg=True)
 
         logger.info("RTSP forwarding enabled for %s", self.camera_info.did)
