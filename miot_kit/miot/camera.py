@@ -101,6 +101,7 @@ class MIoTCameraInstance:
     _reconnect_timeout: int
 
     _decoders: List[MIoTMediaDecoder]
+    _last_audio_codec: Dict[int, MIoTCameraCodec]
 
     def __init__(
         self,
@@ -129,6 +130,7 @@ class MIoTCameraInstance:
         self._reconnect_timer = None
         self._reconnect_timeout = CAMERA_RECONNECT_TIME_MIN
         self._decoders = []
+        self._last_audio_codec = {}
 
         model: str = camera_info.model
         channel_count: int = camera_info.channel_count
@@ -148,6 +150,10 @@ class MIoTCameraInstance:
     def camera_info(self) -> MIoTCameraInfo:
         """Camera info."""
         return self._camera_info
+
+    def get_last_audio_codec(self, channel: int = 0) -> Optional[MIoTCameraCodec]:
+        """Get last audio codec for channel if available."""
+        return self._last_audio_codec.get(channel)
 
     async def destroy_async(self) -> None:
         """Destroy camera."""
@@ -469,6 +475,7 @@ class MIoTCameraInstance:
                 )
         elif codec_id in [MIoTCameraCodec.AUDIO_OPUS, MIoTCameraCodec.AUDIO_G711A, MIoTCameraCodec.AUDIO_G711U]:
             # raw audio
+            self._last_audio_codec[channel] = codec_id
             if self._callbacks.get(f"decode_pcm.{channel}", None):
                 self._decoders[channel].push_audio_frame(frame_data)
             a_callbacks = self._callbacks.get(f"raw_audio.{channel}", {})

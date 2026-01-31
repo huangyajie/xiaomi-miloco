@@ -244,7 +244,11 @@ class MiotProxy:
         camera_instance = await self._get_camera_instance(camera_info)
         if camera_instance is not None:
             quality = self._get_miot_camera_quality(camera_info.did)
-            await camera_instance.start_async(qualities=quality, enable_reconnect=True)
+            await camera_instance.start_async(
+                qualities=quality,
+                enable_audio=bool(self._rtsp_server),
+                enable_reconnect=True
+            )
 
             # Use RTSP-enabled handler if RTSP server is running
             if self._rtsp_server:
