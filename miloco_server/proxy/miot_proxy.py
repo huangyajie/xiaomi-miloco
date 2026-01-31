@@ -12,7 +12,15 @@ from typing import Callable, Coroutine, Optional
 
 from pydantic_core import to_jsonable_python
 from miot.client import MIoTClient
-from miot.types import MIoTOauthInfo, MIoTCameraInfo, MIoTCameraStatus, MIoTDeviceInfo, MIoTManualSceneInfo, MIoTUserInfo
+from miot.types import (
+    MIoTOauthInfo,
+    MIoTCameraInfo,
+    MIoTCameraStatus,
+    MIoTCameraVideoQuality,
+    MIoTDeviceInfo,
+    MIoTManualSceneInfo,
+    MIoTUserInfo,
+)
 from miot.camera import MIoTCameraInstance
 from miot.rtsp_camera import RtspCameraInfo, RTSPCamera
 from miot.rtsp_server import RtspServer
@@ -170,6 +178,22 @@ class MiotProxy:
         else:
             self._oauth_info = None
 
+    def _get_miot_camera_quality(self, camera_did: str) -> MIoTCameraVideoQuality:
+        quality_cfg = CAMERA_CONFIG.get("video_quality") or {}
+        default_value = quality_cfg.get("default", "low")
+        overrides = quality_cfg.get("overrides") or {}
+        value = overrides.get(camera_did, default_value)
+
+        # Per-channel quality is out of scope; take first if provided as list.
+        if isinstance(value, list):
+            value = value[0] if value else default_value
+
+        return (
+            MIoTCameraVideoQuality.HIGH
+            if isinstance(value, str) and value.strip().lower() == "high"
+            else MIoTCameraVideoQuality.LOW
+        )
+
 
     def get_recent_camera_img(self, camera_id: str, channel: int, recent_count: int) -> CameraImgSeq | None:
         manager = self._camera_img_managers.get(camera_id)
@@ -219,7 +243,8 @@ class MiotProxy:
     async def _create_camera_img_manager(self, camera_info: MIoTCameraInfo) -> CameraVisionHandler | None:
         camera_instance = await self._get_camera_instance(camera_info)
         if camera_instance is not None:
-            await camera_instance.start_async(enable_reconnect=True)
+            quality = self._get_miot_camera_quality(camera_info.did)
+            await camera_instance.start_async(qualities=quality, enable_reconnect=True)
 
             # Use RTSP-enabled handler if RTSP server is running
             if self._rtsp_server:

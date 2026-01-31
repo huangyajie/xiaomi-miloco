@@ -57,6 +57,10 @@ trigger_rule_runner:
 # Camera configuration
 camera:
   frame_interval: 500 # Unit: Millisecond (ms)
+  video_quality:
+    default: "low"  # low/high
+    overrides:
+      # "camera_did": "high"
   rtsp_server:
     enabled: true  # Enable/disable RTSP server
     port: 8554     # RTSP server port
