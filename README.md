@@ -14,6 +14,7 @@ English | [简体中文](README.zh_Hans.md)
 
 ## News
 
+- **[2026-01] v0.1.6 Released**: Adds configurable MIoT camera video quality and enables RTSP audio streaming.
 - **[2026-01] v0.1.5 Released**: Supports Home Assistant devices as triggers for automation rules.
 - **[2025-12] v0.1.4 Released**: Added comprehensive support for Home Assistant (HA) devices.
 - **[2025-12] v0.1.3 Released**:

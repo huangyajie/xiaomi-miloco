@@ -7,6 +7,7 @@ Provides functionality to handle camera image queues and vision processing.
 """
 
 import asyncio
+import audioop  # pylint: disable=deprecated-module
 import logging
 import time
 import threading
@@ -201,14 +202,42 @@ class RTSPEnabledCameraVisionHandler(CameraVisionHandler):
         self._stream_reg_ids: dict[int, int] = {}
         # Track detected codecs
         self._detected_video_codec = 0
-        self._detected_audio_codec = 0
         self._stream_added = False
+        self._stream_add_timer: asyncio.TimerHandle | None = None
+        self._stream_add_timeout_s = 1.0
+        self._last_audio_ts_ms = 0
+        self._audio_seq = 0
+        self._audio_resample_state = None
+        self._rtsp_audio_codec = 1027  # G711A
 
         # Call parent constructor
         super().__init__(camera_info, miot_camera_instance, max_size, ttl)
 
         # Register raw video stream to forward to RTSP
         asyncio.create_task(self._register_rtsp_forwarding())
+
+    def _try_add_stream(self, force: bool = False) -> None:
+        if self._stream_added or not self._rtsp_server:
+            return
+        if self._detected_video_codec == 0:
+            return
+        audio_codec = self._rtsp_audio_codec
+        if audio_codec == 0 and not force:
+            return
+
+        if self._rtsp_server.add_stream(self.camera_info.did, self._detected_video_codec, audio_codec):
+            self._stream_added = True
+            if self._stream_add_timer:
+                self._stream_add_timer.cancel()
+                self._stream_add_timer = None
+            logger.info(
+                "RTSP stream added for %s (video: %s, audio: %s)",
+                self.camera_info.did,
+                "H264" if self._detected_video_codec == 4 else "H265",
+                {0: "none", 1026: "G711U", 1027: "G711A", 1032: "OPUS"}.get(audio_codec, "unknown"),
+            )
+        else:
+            logger.warning("Failed to add RTSP stream for %s", self.camera_info.did)
 
     async def _register_rtsp_forwarding(self):
         """Register a callback to forward video frames to RTSP server."""
@@ -221,37 +250,49 @@ class RTSPEnabledCameraVisionHandler(CameraVisionHandler):
                     logger.info("Detected video codec: %s for %s",
                               "H264" if codec_id == 4 else "H265", did)
 
-                # Add RTSP stream if not added yet
+                # Add RTSP stream when ready; wait briefly for audio codec detection
                 if not self._stream_added:
-                    self._stream_added = True
-                    # Default to G711A for audio if not detected
-                    audio_codec = self._detected_audio_codec if self._detected_audio_codec > 0 else 1027
-
-                    if self._rtsp_server.add_stream(did, self._detected_video_codec, audio_codec):
-                        logger.info("RTSP stream added for %s (video: %s, audio: %s)",
-                                  did,
-                                  "H264" if self._detected_video_codec == 4 else "H265",
-                                  {1026: "G711U", 1027: "G711A", 1032: "OPUS"}[audio_codec])
-                    else:
-                        logger.warning("Failed to add RTSP stream for %s", did)
-                        return
+                    self._try_add_stream()
+                    if not self._stream_added and self._stream_add_timer is None:
+                        loop = asyncio.get_running_loop()
+                        self._stream_add_timer = loop.call_later(
+                            self._stream_add_timeout_s,
+                            self._try_add_stream,
+                            True
+                        )
 
                 # Forward video frame to RTSP server
                 if self._rtsp_server:
                     frame_type = 1 if self._is_i_frame(data) else 0
                     self._rtsp_server.push_frame(did, self._detected_video_codec, data, ts, seq, frame_type)
 
-        async def on_audio(did: str, data: bytes, ts: int, seq: int, channel: int):  # pylint: disable=unused-argument
-            # Audio is harder to detect from data, assume common codec
-            if self._detected_audio_codec == 0:
-                # Default to G711A for Xiaomi cameras
-                self._detected_audio_codec = 1027
-                logger.info("Using default audio codec: G711A for %s", did)
+        async def on_pcm(did: str, data: bytes, ts: int, channel: int):  # pylint: disable=unused-argument
+            if not data or not self._rtsp_server:
+                return
+            if not self._stream_added:
+                self._try_add_stream()
+                if not self._stream_added:
+                    return
+
+            # MIoT decoder outputs 16kHz mono s16 PCM; downsample to 8kHz for G711A.
+            pcm_8k, self._audio_resample_state = audioop.ratecv(
+                data, 2, 1, 16000, 8000, self._audio_resample_state
+            )
+            alaw = audioop.lin2alaw(pcm_8k, 2)
+            if not alaw:
+                return
+
+            if self._last_audio_ts_ms == 0:
+                self._last_audio_ts_ms = int(time.time() * 1000)
+            else:
+                self._last_audio_ts_ms += int(len(alaw) * 1000 / 8000)
+            self._audio_seq += 1
+            self._rtsp_server.push_frame(did, self._rtsp_audio_codec, alaw, self._last_audio_ts_ms, self._audio_seq, 0)
 
         # Register video callback
         self._rtsp_reg_id = await self.miot_camera_instance.register_raw_video_async(on_video, multi_reg=True)
-        # Register audio callback
-        self._rtsp_audio_reg_id = await self.miot_camera_instance.register_raw_audio_async(on_audio, multi_reg=True)
+        # Register PCM decode callback for audio transcoding
+        self._rtsp_audio_reg_id = await self.miot_camera_instance.register_decode_pcm_async(on_pcm, multi_reg=True)
 
         logger.info("RTSP forwarding enabled for %s", self.camera_info.did)
 
