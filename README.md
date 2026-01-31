@@ -14,9 +14,9 @@ English | [简体中文](README.zh_Hans.md)
 
 ## News
 
-- **[2026-01] v0.15 Released**: Supports Home Assistant devices as triggers for automation rules.
-- **[2025-12] v0.14 Released**: Added comprehensive support for Home Assistant (HA) devices.
-- **[2025-12] v0.13 Released**:
+- **[2026-01] v0.1.5 Released**: Supports Home Assistant devices as triggers for automation rules.
+- **[2025-12] v0.1.4 Released**: Added comprehensive support for Home Assistant (HA) devices.
+- **[2025-12] v0.1.3 Released**:
   - Support for integrating third-party RTSP cameras.
   - Provides RTSP service capability for Xiaomi cameras.
   - Added macOS (MPS) hardware acceleration support for AI engine.
