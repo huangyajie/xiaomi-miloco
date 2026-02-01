@@ -73,6 +73,8 @@ class MIoTClient:
         lang: Optional[str] = None,
         oauth_info: Optional[MIoTOauthInfo | Dict] = None,
         cloud_server: Optional[str] = None,
+        enable_hw_accel: bool = True,
+        hw_accel_backend: Optional[str] = None,
         loop: Optional[asyncio.AbstractEventLoop] = None
     ) -> None:
         """MIoT Client init.
@@ -102,6 +104,8 @@ class MIoTClient:
         self._main_loop = loop or asyncio.get_event_loop()
         self._cloud_server = cloud_server or CLOUD_SERVER_DEFAULT
         self._lang = lang or SYSTEM_LANGUAGE_DEFAULT
+        self._enable_hw_accel = enable_hw_accel
+        self._hw_accel_backend = hw_accel_backend
 
         self._cameras_buffer = None
         self._last_lan_ping_ts = 0
@@ -191,6 +195,8 @@ class MIoTClient:
         self._camera_client = MIoTCamera(
             cloud_server=self._cloud_server,
             access_token=self._oauth_info.access_token if self._oauth_info else "",
+            enable_hw_accel=self._enable_hw_accel,
+            hw_accel_backend=self._hw_accel_backend,
             loop=self._main_loop)
         await self._camera_client.init_async()
         self._init_done = True
@@ -389,7 +395,7 @@ class MIoTClient:
         cameras: Dict[str, MIoTCameraInfo] = {}
         devices = await self.get_devices_async(home_list=home_list, fetch_share_home=fetch_share_home)
         for did, device_info in devices.items():
-            device_class = device_info.model.split('.')[1]
+            device_class = device_info.model.split(".")[1]
             if device_class not in camera_extra_info.allow_classes:
                 continue
             if device_class in camera_extra_info.denylist:
@@ -433,7 +439,8 @@ class MIoTClient:
     async def create_camera_instance_async(
         self, camera_info: MIoTCameraInfo,
         frame_interval: int = 500,
-        enable_hw_accel: bool = True
+        enable_hw_accel: bool = True,
+        hw_accel_backend: Optional[str] = None,
     ) -> MIoTCameraInstance:
         """Create camera instance.
 
@@ -446,7 +453,8 @@ class MIoTClient:
         return await self._camera_client.create_camera_async(
             camera_info=camera_info,
             frame_interval=frame_interval,
-            enable_hw_accel=enable_hw_accel
+            enable_hw_accel=enable_hw_accel,
+            hw_accel_backend=hw_accel_backend,
         )
 
     async def get_camera_instance_async(self, did: str) -> Optional[MIoTCameraInstance]:

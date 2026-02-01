@@ -10,7 +10,7 @@ import logging
 import subprocess
 import threading
 import time
-from typing import List, Callable, Coroutine, Optional
+from typing import Any, List, Callable, Coroutine, Optional
 from io import BytesIO
 from av.packet import Packet
 from av.codec import CodecContext
@@ -102,6 +102,10 @@ class MIoTMediaDecoder(threading.Thread):
     _frame_interval: int
     _enable_hw_accel: bool
     _enable_audio: bool
+    _hw_accel_backend: Optional[str]
+    _hw_decoder: Optional[Any]
+    _hw_decoder_failed: bool
+    _hw_decoder_codec: Optional[MIoTCameraCodec]
 
     # format: did, data, ts, channel
     _video_callback: Callable[[bytes, int, int], Coroutine]
@@ -123,6 +127,7 @@ class MIoTMediaDecoder(threading.Thread):
         video_callback: Callable[[bytes, int, int], Coroutine],
         audio_callback: Optional[Callable[[bytes, int, int], Coroutine]] = None,
         enable_hw_accel: bool = False,
+        hw_accel_backend: Optional[str] = None,
         enable_audio: bool = False,
         main_loop: Optional[asyncio.AbstractEventLoop] = None,
     ) -> None:
@@ -131,6 +136,10 @@ class MIoTMediaDecoder(threading.Thread):
         self._running = False
         self._frame_interval = frame_interval
         self._enable_hw_accel = enable_hw_accel
+        self._hw_accel_backend = hw_accel_backend
+        self._hw_decoder = None
+        self._hw_decoder_failed = False
+        self._hw_decoder_codec = None
         self._enable_audio = enable_audio
 
         self._video_callback = video_callback
@@ -168,6 +177,10 @@ class MIoTMediaDecoder(threading.Thread):
         self._queue.stop()
         self._video_decoder = None
         self._audio_decoder = None
+        if self._hw_decoder and hasattr(self._hw_decoder, "close"):
+            self._hw_decoder.close()
+        self._hw_decoder = None
+        self._hw_decoder_codec = None
         self.join()
 
     def push_video_frame(self, frame_data: MIoTCameraFrameData) -> None:
@@ -197,6 +210,10 @@ class MIoTMediaDecoder(threading.Thread):
         return codec_name
 
     def _on_video_callback(self, frame_data: MIoTCameraFrameData) -> None:
+        if self._enable_hw_accel and self._hw_accel_backend == "rockchip":
+            handled = self._try_hw_decode(frame_data)
+            if handled:
+                return
         if not self._video_decoder:
             # Create video decoder
             if frame_data.codec_id == MIoTCameraCodec.VIDEO_H264:
@@ -224,6 +241,66 @@ class MIoTMediaDecoder(threading.Thread):
                 self._video_callback(jpeg_data, frame_data.timestamp, frame_data.channel)
             )
             self._last_jpeg_ts = now_ts
+
+    def _try_hw_decode(self, frame_data: MIoTCameraFrameData) -> bool:
+        if self._hw_decoder_failed:
+            return False
+        if frame_data.codec_id not in (MIoTCameraCodec.VIDEO_H264, MIoTCameraCodec.VIDEO_H265):
+            return False
+
+        if self._hw_decoder is None or self._hw_decoder_codec != frame_data.codec_id:
+            decoder = self._init_hw_decoder(frame_data.codec_id)
+            if not decoder:
+                return False
+
+        if not self._hw_decoder:
+            return False
+
+        ret = self._hw_decoder.decode(frame_data.data)
+        if ret < 0:
+            _LOGGER.warning("rockchip hw decode failed, fallback to cpu")
+            self._hw_decoder_failed = True
+            return False
+
+        now_ts = int(time.time() * 1000)
+        if now_ts - self._last_jpeg_ts < self._frame_interval:
+            return True
+
+        rgb = self._hw_decoder.get_rgb_frame()
+        if rgb is None:
+            return True
+
+        img: Image.Image = Image.fromarray(rgb, "RGB")
+        buf: BytesIO = BytesIO()
+        img.save(buf, format="JPEG", quality=90)
+        jpeg_data = buf.getvalue()
+        self._main_loop.call_soon_threadsafe(
+            self._main_loop.create_task,
+            self._video_callback(jpeg_data, frame_data.timestamp, frame_data.channel)
+        )
+        self._last_jpeg_ts = now_ts
+        return True
+
+    def _init_hw_decoder(self, codec_id: MIoTCameraCodec) -> Optional[Any]:
+        try:
+            # pylint: disable=import-outside-toplevel
+            from .rockchip_hwaccel import RockchipHwDecoder
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            _LOGGER.warning("rockchip hwaccel not available: %s", exc)
+            self._hw_decoder_failed = True
+            return None
+
+        coding_type = 1 if codec_id == MIoTCameraCodec.VIDEO_H264 else 2
+        decoder = RockchipHwDecoder(coding_type)
+        if not decoder.is_available():
+            _LOGGER.warning("rockchip hwaccel init failed")
+            self._hw_decoder_failed = True
+            return None
+
+        self._hw_decoder = decoder
+        self._hw_decoder_codec = codec_id
+        _LOGGER.info("rockchip hwaccel enabled")
+        return decoder
 
     def _on_audio_callback(self, frame_data: MIoTCameraFrameData) -> None:
         if not self._audio_decoder:

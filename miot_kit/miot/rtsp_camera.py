@@ -121,6 +121,7 @@ class RTSPCameraInstance:
         manager: "RTSPCamera",
         frame_interval: int,
         enable_hw_accel: bool,
+        hw_accel_backend: Optional[str],
         camera_info: RtspCameraInfo,
         main_loop: Optional[asyncio.AbstractEventLoop] = None,
     ) -> None:
@@ -130,6 +131,7 @@ class RTSPCameraInstance:
         self._camera_info = camera_info
         self._frame_interval = frame_interval
         self._enable_hw_accel = enable_hw_accel
+        self._hw_accel_backend = hw_accel_backend
         self._callback_refs: Dict[str, Callable] = {}
 
         self._rtsp_url: str = camera_info.rtsp_url
@@ -197,6 +199,7 @@ class RTSPCameraInstance:
                 video_callback=self.__on_video_decode_callback,
                 audio_callback=self.__on_audio_decode_callback,
                 enable_hw_accel=self._enable_hw_accel,
+                hw_accel_backend=self._hw_accel_backend,
                 enable_audio=self._enable_audio,
                 main_loop=self._main_loop,
             )
@@ -626,11 +629,13 @@ class RTSPCamera:
         self,
         frame_interval: int = 500,
         enable_hw_accel: bool = True,
+        hw_accel_backend: Optional[str] = None,
         loop: Optional[asyncio.AbstractEventLoop] = None,
     ) -> None:
         self._main_loop = loop or asyncio.get_running_loop()
         self._frame_interval = frame_interval
         self._enable_hw_accel = enable_hw_accel
+        self._hw_accel_backend = hw_accel_backend
         self._camera_map: Dict[str, RTSPCameraInstance] = {}
 
         self._lib_rtsp_camera = _load_rtsp_dynamic_lib()
@@ -656,6 +661,7 @@ class RTSPCamera:
         camera_info: RtspCameraInfo | Dict,
         frame_interval: Optional[int] = None,
         enable_hw_accel: Optional[bool] = None,
+        hw_accel_backend: Optional[str] = None,
     ) -> RTSPCameraInstance:
         """Create camera."""
         camera: RtspCameraInfo = (
@@ -670,6 +676,7 @@ class RTSPCamera:
             frame_interval=frame_interval or self._frame_interval,
             # respect explicit False; only fall back when None
             enable_hw_accel=self._enable_hw_accel if enable_hw_accel is None else enable_hw_accel,
+            hw_accel_backend=hw_accel_backend or self._hw_accel_backend,
             camera_info=camera,
             main_loop=self._main_loop,
         )
