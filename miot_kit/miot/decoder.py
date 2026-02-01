@@ -106,6 +106,8 @@ class MIoTMediaDecoder(threading.Thread):
     _hw_decoder: Optional[Any]
     _hw_decoder_failed: bool
     _hw_decoder_codec: Optional[MIoTCameraCodec]
+    _hw_decoder_fail_count: int
+    _hw_decoder_fail_limit: int
 
     # format: did, data, ts, channel
     _video_callback: Callable[[bytes, int, int], Coroutine]
@@ -140,6 +142,8 @@ class MIoTMediaDecoder(threading.Thread):
         self._hw_decoder = None
         self._hw_decoder_failed = False
         self._hw_decoder_codec = None
+        self._hw_decoder_fail_count = 0
+        self._hw_decoder_fail_limit = 30
         self._enable_audio = enable_audio
 
         self._video_callback = video_callback
@@ -258,12 +262,25 @@ class MIoTMediaDecoder(threading.Thread):
 
         ret = self._hw_decoder.decode(frame_data.data)
         if ret < 0:
-            _LOGGER.warning("rockchip hw decode failed, fallback to cpu")
-            self._hw_decoder_failed = True
-            return False
+            self._hw_decoder_fail_count += 1
+            if self._hw_decoder_fail_count >= self._hw_decoder_fail_limit:
+                _LOGGER.warning(
+                    "rockchip hw decode failed %d times, fallback to cpu",
+                    self._hw_decoder_fail_count,
+                )
+                self._hw_decoder_failed = True
+                return False
+            if hasattr(self._hw_decoder, "drain"):
+                self._hw_decoder.drain()
+            _LOGGER.debug("rockchip hw decode transient failure: %s", ret)
+            return True
+
+        self._hw_decoder_fail_count = 0
 
         now_ts = int(time.time() * 1000)
         if now_ts - self._last_jpeg_ts < self._frame_interval:
+            if hasattr(self._hw_decoder, "drain"):
+                self._hw_decoder.drain()
             return True
 
         rgb = self._hw_decoder.get_rgb_frame()
@@ -299,6 +316,7 @@ class MIoTMediaDecoder(threading.Thread):
 
         self._hw_decoder = decoder
         self._hw_decoder_codec = codec_id
+        self._hw_decoder_fail_count = 0
         _LOGGER.info("rockchip hwaccel enabled")
         return decoder
 

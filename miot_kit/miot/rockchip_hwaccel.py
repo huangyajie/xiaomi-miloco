@@ -125,6 +125,14 @@ class RockchipHwDecoder:
         data_ptr = (ctypes.c_ubyte * len(data)).from_buffer_copy(data)
         return self._lib.mpp_decoder_decode(self._handle, data_ptr, len(data))
 
+    def drain(self) -> bool:
+        """Drain one decoded frame without RGA conversion."""
+        if not self._handle:
+            return False
+        frame_info = DecodedFrame()
+        ret = self._lib.mpp_decoder_get_frame(self._handle, ctypes.byref(frame_info))
+        return ret == 0
+
     def get_rgb_frame(self) -> Optional[np.ndarray]:
         if not self._handle or not self._rga_ctx:
             return None
