@@ -628,7 +628,7 @@ class RTSPCamera:
     def __init__(
         self,
         frame_interval: int = 500,
-        enable_hw_accel: bool = True,
+        enable_hw_accel: bool = False,
         hw_accel_backend: Optional[str] = None,
         loop: Optional[asyncio.AbstractEventLoop] = None,
     ) -> None:

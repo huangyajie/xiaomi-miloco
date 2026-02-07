@@ -198,7 +198,7 @@ class MIoTClient:
             enable_hw_accel=self._enable_hw_accel,
             hw_accel_backend=self._hw_accel_backend,
             loop=self._main_loop)
-        await self._camera_client.init_async()
+        await self._camera_client.init_async(enable_hw_accel=self._enable_hw_accel)
         self._init_done = True
 
     async def deinit_async(self) -> None:
@@ -439,7 +439,7 @@ class MIoTClient:
     async def create_camera_instance_async(
         self, camera_info: MIoTCameraInfo,
         frame_interval: int = 500,
-        enable_hw_accel: bool = True,
+        enable_hw_accel: Optional[bool] = None,
         hw_accel_backend: Optional[str] = None,
     ) -> MIoTCameraInstance:
         """Create camera instance.
