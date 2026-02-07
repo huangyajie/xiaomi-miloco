@@ -2,7 +2,7 @@
 
 > **🚀 Personal Fork Note**
 > This branch is an actively maintained version by the developer, dedicated to faster feature iterations and bug fixes.
-> **Key Enhancements:** Full support for Home Assistant integration, RTSP camera support, and macOS (MPS) acceleration.
+> **Key Enhancements:** Full support for Home Assistant integration, RTSP camera support, Rockchip (MPP+RGA) acceleration, and macOS (MPS) acceleration.
 
 **Xiaomi Local Copilot** is a future exploration solution for smart homes. Using Xiaomi Home cameras as the source of visual information and a self-developed LLM as its core, it connects all IoT devices throughout the house. Based on the development paradigm of LLM, it enables users to define various family needs and rules in natural language, achieving broader and more creative smart device integration.
 
@@ -14,6 +14,7 @@ English | [简体中文](README.zh_Hans.md)
 
 ## News
 
+- **[2026-02] v0.1.7 Released**: Adds Rockchip MPP+RGA hardware acceleration for camera decoding.
 - **[2026-01] v0.1.6 Released**: Adds configurable MIoT camera video quality and enables RTSP audio streaming.
 - **[2026-01] v0.1.5 Released**: Supports Home Assistant devices as triggers for automation rules.
 - **[2025-12] v0.1.4 Released**: Added comprehensive support for Home Assistant (HA) devices.
