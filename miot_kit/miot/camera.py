@@ -85,6 +85,7 @@ class MIoTCameraInstance:
     _did: str
     _frame_interval: int
     _enable_hw_accel: bool
+    _hw_accel_backend: Optional[str]
 
     _camera_info: MIoTCameraInfo
     _callback_refs: Dict[str, Callable]
@@ -108,6 +109,7 @@ class MIoTCameraInstance:
         manager: "MIoTCamera",
         frame_interval: int,
         enable_hw_accel: bool,
+        hw_accel_backend: Optional[str],
         camera_info: MIoTCameraInfo,
         main_loop: Optional[asyncio.AbstractEventLoop] = None,
     ):
@@ -118,6 +120,7 @@ class MIoTCameraInstance:
         self._did = camera_info.did
         self._frame_interval = frame_interval
         self._enable_hw_accel = enable_hw_accel
+        self._hw_accel_backend = hw_accel_backend
         self._callback_refs = {}
 
         self._video_qualities = [MIoTCameraVideoQuality.LOW]
@@ -200,6 +203,7 @@ class MIoTCameraInstance:
                 video_callback=self.__on_video_decode_callback,
                 audio_callback=self.__on_audio_decode_callback,
                 enable_hw_accel=self._enable_hw_accel,
+                hw_accel_backend=self._hw_accel_backend,
                 enable_audio=self._enable_audio,
                 main_loop=self._main_loop
             )
@@ -624,6 +628,7 @@ class MIoTCamera:
 
     def __init__(
             self, cloud_server: str, access_token: str, frame_interval: int = 500, enable_hw_accel: bool = True,
+            hw_accel_backend: Optional[str] = None,
             loop: Optional[asyncio.AbstractEventLoop] = None
     ) -> None:
         """Init."""
@@ -636,6 +641,7 @@ class MIoTCamera:
         self._access_token = access_token
         self._frame_interval = frame_interval
         self._enable_hw_accel = enable_hw_accel
+        self._hw_accel_backend = hw_accel_backend
         self._camera_map = {}
 
         # lib init
@@ -687,6 +693,7 @@ class MIoTCamera:
         camera_info: MIoTCameraInfo | Dict,
         frame_interval: Optional[int] = None,
         enable_hw_accel: Optional[bool] = None,
+        hw_accel_backend: Optional[str] = None,
     ) -> MIoTCameraInstance:
         """Create camera."""
         camera: MIoTCameraInfo = (
@@ -699,7 +706,8 @@ class MIoTCamera:
         self._camera_map[did] = MIoTCameraInstance(
             manager=self,
             frame_interval=frame_interval or self._frame_interval,
-            enable_hw_accel=enable_hw_accel or self._enable_hw_accel,
+            enable_hw_accel=enable_hw_accel if enable_hw_accel is not None else self._enable_hw_accel,
+            hw_accel_backend=hw_accel_backend or self._hw_accel_backend,
             camera_info=camera,
             main_loop=self._main_loop
         )

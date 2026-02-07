@@ -57,6 +57,9 @@ trigger_rule_runner:
 # Camera configuration
 camera:
   frame_interval: 500 # Unit: Millisecond (ms)
+  hw_accel:
+    enabled: false
+    backend: "rockchip"
   video_quality:
     default: "low"  # low/high
     overrides:

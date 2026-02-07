@@ -100,6 +100,7 @@ TRIGGER_RULE_RUNNER_CONFIG = {
 # Camera configuration
 CAMERA_CONFIG = {
     "frame_interval": _config["camera"]["frame_interval"],
+    "hw_accel": _config["camera"].get("hw_accel", {}),
     "video_quality": _config["camera"].get("video_quality", {}),
     "camera_img_cache_max_size": max(
         TRIGGER_RULE_RUNNER_CONFIG["vision_use_img_count"],

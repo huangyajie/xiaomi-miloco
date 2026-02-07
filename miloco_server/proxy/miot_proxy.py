@@ -53,16 +53,15 @@ class MiotProxy:
         self._token_refresh_task: Optional[asyncio.Task] = None
         self._rtsp_camera_info_dict: dict[str, RtspCameraInfo] = {}
 
-        self._miot_client = MIoTClient(
-            uuid=uuid,
-            redirect_uri=redirect_uri,
-            cache_path=str(MIOT_CACHE_DIR),
-            oauth_info=self._oauth_info,
-            cloud_server=cloud_server,
-        )
-
         self._token_refresh_task = None
         self._frame_interval: int = CAMERA_CONFIG["frame_interval"]
+        hw_accel_cfg = CAMERA_CONFIG.get("hw_accel", {}) or {}
+        self._hw_accel_enabled: bool = bool(hw_accel_cfg.get("enabled", False))
+        self._hw_accel_backend: Optional[str] = hw_accel_cfg.get("backend")
+        if self._hw_accel_enabled and self._hw_accel_backend != "rockchip":
+            logger.warning("Unsupported hw_accel backend: %s, fallback to cpu", self._hw_accel_backend)
+            self._hw_accel_enabled = False
+            self._hw_accel_backend = None
         self._camera_img_cache_max_size: int = CAMERA_CONFIG["camera_img_cache_max_size"]
         self._rtsp_camera_configs: list[RtspCameraConfig] = [
             cfg if isinstance(cfg, RtspCameraConfig) else RtspCameraConfig.model_validate(cfg)
@@ -74,6 +73,16 @@ class MiotProxy:
         self._camera_img_cache_ttl: int = max(1, int(self._frame_interval * self._camera_img_cache_max_size / 1000 * 2))
         self._camera_img_managers: dict[str, BaseCameraVisionHandler] = {}
         self._rtsp_camera_client: Optional[RTSPCamera] = None
+
+        self._miot_client = MIoTClient(
+            uuid=uuid,
+            redirect_uri=redirect_uri,
+            cache_path=str(MIOT_CACHE_DIR),
+            oauth_info=self._oauth_info,
+            cloud_server=cloud_server,
+            enable_hw_accel=self._hw_accel_enabled,
+            hw_accel_backend=self._hw_accel_backend,
+        )
 
         # Initialize RTSP Server
         self._rtsp_server: Optional[RtspServer] = None
@@ -93,7 +102,11 @@ class MiotProxy:
 
         if self._rtsp_camera_configs:
             try:
-                self._rtsp_camera_client = RTSPCamera(frame_interval=self._frame_interval)
+                self._rtsp_camera_client = RTSPCamera(
+                    frame_interval=self._frame_interval,
+                    enable_hw_accel=self._hw_accel_enabled,
+                    hw_accel_backend=self._hw_accel_backend,
+                )
                 logger.info("RTSP camera client initialized")
             except FileNotFoundError as exc:
                 logger.warning("RTSP library not found, will mark RTSP cameras offline: %s", exc)
