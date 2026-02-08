@@ -283,14 +283,12 @@ class MIoTMediaDecoder(threading.Thread):
                 self._hw_decoder.drain()
             return True
 
-        rgb = self._hw_decoder.get_rgb_frame()
-        if rgb is None:
+        # Prefer Rockchip JPEG bytes (HW MJPEG encode when available, otherwise SW JPEG using the same decoded frame).
+        # If None, it usually means no decoded frame is ready yet.
+        jpeg_data: Optional[bytes] = self._hw_decoder.get_jpeg_frame(quality=90)
+        if jpeg_data is None:
             return True
 
-        img: Image.Image = Image.fromarray(rgb, "RGB")
-        buf: BytesIO = BytesIO()
-        img.save(buf, format="JPEG", quality=90)
-        jpeg_data = buf.getvalue()
         self._main_loop.call_soon_threadsafe(
             self._main_loop.create_task,
             self._video_callback(jpeg_data, frame_data.timestamp, frame_data.channel)
