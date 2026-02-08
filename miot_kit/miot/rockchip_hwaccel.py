@@ -2,7 +2,7 @@
 # Copyright (C) 2025 Xiaomi Corporation
 # This software may be used and distributed according to the terms of the Xiaomi Miloco License Agreement.
 """
-Rockchip hardware decoder (MPP + RGA).
+Rockchip hardware video pipeline helpers (MPP decode + RGA + MPP MJPEG encode).
 """
 from __future__ import annotations
 
@@ -11,10 +11,15 @@ import logging
 import platform
 from pathlib import Path
 from typing import Optional
+from io import BytesIO
 
 import numpy as np
+from PIL import Image
 
 _LOGGER = logging.getLogger(__name__)
+
+# Cache the CDLL instance to avoid repeatedly loading the same .so.
+lib_cache: Optional[ctypes.CDLL] = None
 
 # MPP format constants (partial)
 MPP_FMT_YUV420SP = 0x0    # NV12
@@ -45,6 +50,11 @@ def _default_lib_path() -> Path:
 
 
 def _load_library() -> Optional[ctypes.CDLL]:
+    global lib_cache  # pylint: disable=global-statement
+
+    if lib_cache is not None:
+        return lib_cache
+
     system = platform.system().lower()
     machine = platform.machine().lower()
     if system != "linux" or machine not in ("aarch64", "arm64"):
@@ -53,19 +63,13 @@ def _load_library() -> Optional[ctypes.CDLL]:
     lib_path = _default_lib_path()
     if lib_path.exists():
         try:
-            lib = ctypes.CDLL(str(lib_path))
+            lib_cache = ctypes.CDLL(str(lib_path))
             _LOGGER.info("Loaded rockchip hwaccel library: %s", lib_path)
-            return lib
+            return lib_cache
         except OSError as exc:  # pylint: disable=broad-exception-caught
             _LOGGER.warning("Failed to load rockchip hwaccel library %s: %s", lib_path, exc)
-            return None
 
-    try:
-        lib = ctypes.CDLL("librockchip_hwaccel.so")
-        _LOGGER.info("Loaded rockchip hwaccel library from system path")
-        return lib
-    except OSError:
-        return None
+    return None
 
 
 class RockchipHwDecoder:
@@ -104,6 +108,25 @@ class RockchipHwDecoder:
         except AttributeError:
             self._rga_ctx = None
 
+        self._jpeg_enc: Optional[ctypes.c_void_p] = None
+        # MJPEG encode symbols may be absent depending on the native lib build.
+        try:
+            self._lib.mpp_jpeg_enc_init.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_int]
+            self._lib.mpp_jpeg_enc_init.restype = ctypes.c_void_p
+            self._lib.mpp_jpeg_enc_destroy.argtypes = [ctypes.c_void_p]
+            self._lib.mpp_jpeg_enc_destroy.restype = None
+            self._lib.mpp_jpeg_enc_encode_fd.argtypes = [
+                ctypes.c_void_p,
+                ctypes.c_int, ctypes.c_size_t,
+                ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+                ctypes.POINTER(ctypes.c_void_p), ctypes.POINTER(ctypes.c_size_t),
+            ]
+            self._lib.mpp_jpeg_enc_encode_fd.restype = ctypes.c_int
+            self._lib.mpp_buf_free.argtypes = [ctypes.c_void_p]
+            self._lib.mpp_buf_free.restype = None
+        except AttributeError:
+            pass
+
         self._handle = self._lib.mpp_decoder_init(coding_type)
         if not self._handle:
             _LOGGER.warning("Failed to initialize rockchip MPP decoder")
@@ -118,6 +141,9 @@ class RockchipHwDecoder:
         if self._lib and self._rga_ctx:
             self._lib.rga_destroy_ctx(self._rga_ctx)
             self._rga_ctx = None
+        if self._lib and self._jpeg_enc:
+            self._lib.mpp_jpeg_enc_destroy(self._jpeg_enc)
+            self._jpeg_enc = None
 
     def decode(self, data: bytes) -> int:
         if not self._handle or not data:
@@ -145,7 +171,14 @@ class RockchipHwDecoder:
         if frame_info.fd < 0 or not frame_info.data or frame_info.size == 0:
             return None
 
-        src_fmt = None
+        return self._rga_frame_to_rgb(frame_info)
+
+    def _rga_frame_to_rgb(self, frame_info: DecodedFrame) -> Optional[np.ndarray]:
+        if not self._lib or not self._rga_ctx:
+            return None
+        if frame_info.fd < 0 or frame_info.size == 0:
+            return None
+
         if frame_info.format == MPP_FMT_YUV420SP:
             src_fmt = RGA_FMT_YUV_420_SP
         elif frame_info.format == MPP_FMT_YUV420SP_VU:
@@ -180,3 +213,68 @@ class RockchipHwDecoder:
             return np_arr.copy()
         finally:
             self._lib.rga_free(dst_ptr)
+
+    def get_jpeg_frame(self, quality: int = 80) -> Optional[bytes]:
+        """Return a JPEG-encoded frame (bytes) using Rockchip MPP MJPEG encoder.
+
+        This drains one decoded frame from MPP internally, same as get_rgb_frame().
+        """
+        if not self._handle or not self._rga_ctx or not self._lib:
+            return None
+
+        frame_info = DecodedFrame()
+        ret = self._lib.mpp_decoder_get_frame(self._handle, ctypes.byref(frame_info))
+        if ret != 0:
+            return None
+
+        if frame_info.fd < 0 or frame_info.size == 0:
+            return None
+
+        q = int(max(1, min(99, quality)))
+
+        try:
+            if frame_info.format == MPP_FMT_YUV420SP:
+                src_fmt = RGA_FMT_YUV_420_SP
+            elif frame_info.format == MPP_FMT_YUV420SP_VU:
+                src_fmt = RGA_FMT_YCRCB_420_SP
+            else:
+                src_fmt = None
+
+            if src_fmt is not None:
+                if not self._jpeg_enc:
+                    self._jpeg_enc = self._lib.mpp_jpeg_enc_init(frame_info.width, frame_info.height, q)
+
+                if self._jpeg_enc:
+                    out_ptr = ctypes.c_void_p()
+                    out_len = ctypes.c_size_t()
+                    e_ret = self._lib.mpp_jpeg_enc_encode_fd(
+                        self._jpeg_enc,
+                        frame_info.fd, frame_info.size,
+                        frame_info.width, frame_info.height, frame_info.hor_stride, frame_info.ver_stride,
+                        src_fmt,
+                        ctypes.byref(out_ptr), ctypes.byref(out_len),
+                    )
+                    if e_ret == 0 and out_ptr.value and out_len.value:
+                        try:
+                            return ctypes.string_at(out_ptr, out_len.value)
+                        finally:
+                            self._lib.mpp_buf_free(out_ptr)
+                    # free(NULL) is a no-op; keep this unconditional to satisfy static analysis.
+                    self._lib.mpp_buf_free(out_ptr)
+        except AttributeError:
+            pass
+        except Exception as exc:  # pylint: disable=broad-except
+            _LOGGER.debug("MPP MJPEG hw encode failed, fallback to sw jpeg: %s", exc)
+
+        # Fallback: use the SAME decoded frame -> RGA RGB -> PIL JPEG.
+        try:
+            rgb = self._rga_frame_to_rgb(frame_info)
+            if rgb is None:
+                return None
+            img: Image.Image = Image.fromarray(rgb, "RGB")
+            buf = BytesIO()
+            img.save(buf, format="JPEG", quality=q)
+            return buf.getvalue()
+        except Exception as exc:  # pylint: disable=broad-except
+            _LOGGER.debug("rockchip sw jpeg fallback failed: %s", exc)
+            return None
