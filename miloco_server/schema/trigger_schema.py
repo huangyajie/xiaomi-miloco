@@ -126,4 +126,7 @@ class TriggerRuleDetail(TriggerRule):
             ha_devices=ha_device_ids,
             execute_info=execute_info)
 
-
+class SendingState(BaseModel):
+    """Sending state data model"""
+    flag: bool = Field(False, description="Sending flag")
+    time: float = Field(0.0, description="Last sending flag time")

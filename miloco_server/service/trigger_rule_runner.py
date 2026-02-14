@@ -13,7 +13,6 @@ import asyncio
 import logging
 import uuid
 
-from miloco_server.schema.mcp_schema import CallToolResult
 from thespian.actors import ActorExitRequest
 
 from miloco_server import actor_system
@@ -26,13 +25,14 @@ from miloco_server.proxy.miot_proxy import MiotProxy
 from miloco_server.proxy.ha_proxy import HAProxy
 from miloco_server.proxy.ha_listener import HaStateListener
 from miloco_server.service.trigger_buffer import TriggerBuffer
+from miloco_server.schema.mcp_schema import CallToolResult
 from miloco_server.schema.miot_schema import CameraImgPathSeq, CameraImgSeq, CameraInfo
 from miloco_server.schema.trigger_log_schema import (
     AiRecommendDynamicExecuteResult, TriggerConditionResult, ActionExecuteResult,
     TriggerRuleLog, NotifyResult, ExecuteResult
 )
 from miloco_server.schema.trigger_schema import (
-    Action, TriggerRule, ExecuteType
+    Action, TriggerRule, ExecuteType, SendingState
 )
 from miloco_server.utils.check_img_motion import check_camera_motion
 from miloco_server.utils.local_models import ModelPurpose
@@ -69,6 +69,9 @@ class TriggerRuleRunner:
         self._is_running: bool = False
         self._interval_seconds = TRIGGER_RULE_RUNNER_CONFIG["interval_seconds"]
         self._vision_use_img_count = TRIGGER_RULE_RUNNER_CONFIG["vision_use_img_count"]
+        # Per-camera last happened cache: key=(rule_id, camera_did, channel)
+        self._last_happened_cache: Dict[tuple[str, str, int], CameraImgSeq] = {}
+        self._sending_states: Dict[str, SendingState] = {}
 
         # Initialize HA Listener
         ha_config = self.ha_proxy.get_ha_config()
@@ -167,7 +170,11 @@ class TriggerRuleRunner:
         """Remove trigger rule"""
         if rule_id in self.trigger_rules:
             del self.trigger_rules[rule_id]
+            self._sending_states.pop(rule_id, None)
             self._update_listener_watched_entities()
+        keys_to_remove = [k for k in self._last_happened_cache if k[0] == rule_id]
+        for key in keys_to_remove:
+            del self._last_happened_cache[key]
 
     async def _periodic_task(self):
         """Scheduled task execution method, runs at configured interval"""
@@ -328,7 +335,7 @@ class TriggerRuleRunner:
                             rule_device_states[entity] = state_info
 
             debug_states = {k: v.get("state") for k, v in rule_device_states.items()}
-            logger.info(
+            logger.debug(
                 "Checking rule %s with device states: %s, trigger_sources: %s",
                 rule.name, debug_states, trigger_sources)
 
@@ -365,8 +372,6 @@ class TriggerRuleRunner:
                 execable = any([
                     trigger_filter.post_filter(
                         rule_id,
-                        f"{condition_result.camera_info.did},"
-                        f"{condition_result.channel}" if condition_result.camera_info else "global",
                         condition_result.result)
                     for condition_result in condition_result_list
                 ])
@@ -386,7 +391,7 @@ class TriggerRuleRunner:
                 else:
                     # Note: We still use post_filter for global state persistence if needed,
                     # but our internal check takes precedence for deduplication.
-                    execable = trigger_filter.post_filter(rule_id, "global", is_triggered)
+                    execable = trigger_filter.post_filter(rule_id, is_triggered)
 
             is_dynamic_action_running = self._check_dynamic_action_is_running(rule_id)
 
@@ -508,8 +513,48 @@ class TriggerRuleRunner:
         Returns:
             LLM response result
         """
+        return await asyncio.wait_for(
+            llm_proxy.async_call_llm(messages),
+            timeout=TRIGGER_RULE_RUNNER_CONFIG["request_timeout_seconds"],
+        )
 
-        return await llm_proxy.async_call_llm(messages)
+    @staticmethod
+    def _parse_llm_output(content) -> Optional[tuple[bool, bool]]:
+        """Parse numeric LLM output (0/1/2) into (is_happened, is_same_action)."""
+        try:
+            stripped = str(content).strip()
+        except Exception:  # pylint: disable=broad-except
+            logger.error("Invalid LLM output: %s", content)
+            return None
+
+        # Accept fenced numeric output like ```1``` / ```\n1\n```.
+        if stripped.startswith("```"):
+            lines = stripped.splitlines()
+            if len(lines) >= 2 and lines[-1].strip() == "```":
+                stripped = "\n".join(lines[1:-1]).strip()
+
+        if stripped == "0":
+            return (False, False)
+        if stripped == "1":
+            return (True, False)
+        if stripped == "2":
+            return (True, True)
+        return None
+
+    @staticmethod
+    def _parse_yes_no_output(content) -> Optional[bool]:
+        """Parse legacy JSON output {"result": "yes"|"no"}."""
+        try:
+            json_content = extract_json_from_content(content)
+            content_dict = json.loads(json_content)
+            result = content_dict.get("result")
+            if result == "yes":
+                return True
+            if result == "no":
+                return False
+        except Exception:  # pylint: disable=broad-except
+            return None
+        return None
 
     async def _check_trigger_condition(
         self, rule: TriggerRule, llm_proxy: LLMProxy,
@@ -521,93 +566,137 @@ class TriggerRuleRunner:
 
         cameras_video: dict[tuple[str, int], CameraImgSeq] = {}
         condition_result_list: List[TriggerConditionResult] = []
+        now_s = time.time()
 
-        # If rule has cameras, collect them
-        if rule.cameras:
-            for camera_id in rule.cameras:
-                if camera_id not in camera_info_dict:
+        sending_state = self._sending_states.get(rule.id)
+        if (sending_state and sending_state.flag and
+                now_s - sending_state.time < TRIGGER_RULE_RUNNER_CONFIG["request_timeout_seconds"]):
+            logger.info("Rule %s is sending, skip this round", rule.id)
+            return condition_result_list
+        self._sending_states[rule.id] = SendingState(flag=True, time=now_s)
+
+        try:
+            # If rule has cameras, collect motion-positive channels only.
+            if rule.cameras:
+                for camera_id in rule.cameras:
+                    if camera_id not in camera_info_dict:
+                        continue
+
+                    channel_motion_dict = camera_motion_dict.get(camera_id, {})
+                    for channel, (if_motion, camera_img_seq) in channel_motion_dict.items():
+                        if if_motion and camera_img_seq:
+                            cameras_video[camera_id, channel] = camera_img_seq
+
+            # If rule has NO cameras, we still need to run LLM if device_states are present.
+            if not cameras_video and rule.ha_devices:
+                cameras_video[("no_camera", 0)] = None
+
+            # Concurrently execute LLM calls
+            tasks = []
+            for (camera_id, channel), camera_img_seq in cameras_video.items():
+                last_happened_img_seq = None
+                if camera_id != "no_camera":
+                    last_happened_img_seq = self._last_happened_cache.get((rule.id, camera_id, channel))
+                messages = TriggerRuleConditionPromptBuilder.build_trigger_rule_prompt(
+                    camera_img_seq,
+                    rule.condition,
+                    self._get_language(),
+                    last_happened_img_seq=last_happened_img_seq,
+                    device_states=device_states)
+                task = self._call_vision_understaning(llm_proxy, messages.get_messages())
+                tasks.append(task)
+
+            if not tasks:
+                return condition_result_list
+
+            # Concurrently execute all tasks
+            responses = await asyncio.gather(*tasks, return_exceptions=True)
+
+            # Process results
+            for ((camera_id, channel),
+                 camera_img_seq), response in zip(cameras_video.items(),
+                                                  responses):
+                if isinstance(response, asyncio.TimeoutError):
+                    logger.error(
+                        "LLM call timeout for rule %s (cam: %s ch:%s)",
+                        rule.name, camera_id, channel
+                    )
                     continue
 
-                camera_info = camera_info_dict[camera_id]
-                channel_motion_dict = camera_motion_dict.get(camera_id, {})
-                for channel, (_, camera_img_seq) in channel_motion_dict.items():
-                    if camera_img_seq:
-                        cameras_video[camera_id, channel] = camera_img_seq
-                    else:
+                if isinstance(response, Exception):
+                    logger.error(
+                        "LLM call failed for rule %s (cam: %s ch:%s): %s",
+                        rule.name, camera_id, channel, response
+                    )
+                    continue
+
+                # Ensure response is dict type before accessing
+                if not isinstance(response, dict):
+                    logger.error(
+                        "Invalid response type for rule %s: %s", rule.name, type(response)
+                    )
+                    continue
+
+                content = response.get("content")
+                logger.info(
+                    "Condition result, rule name: %s, condition: %s, cam: %s, content: %s",
+                    rule.name, rule.condition, camera_id, content
+                )
+
+                if not content:
+                    continue
+
+                if camera_id != "no_camera":
+                    parsed = self._parse_llm_output(content)
+                    if parsed is not None:
+                        is_happened, is_same_action = parsed
+
+                        if not is_happened:
+                            continue
+
+                        if is_same_action:
+                            if camera_img_seq is not None:
+                                self._last_happened_cache[(rule.id, camera_id, channel)] = camera_img_seq
+                            continue
+
+                        if camera_img_seq is not None:
+                            self._last_happened_cache[(rule.id, camera_id, channel)] = camera_img_seq
+
                         condition_result_list.append(
-                            TriggerConditionResult(camera_info=camera_info,
-                                                channel=channel,
-                                                result=False,
-                                                images=None))
+                            TriggerConditionResult(
+                                camera_info=camera_info_dict.get(camera_id),
+                                channel=channel,
+                                result=True
+                            )
+                        )
+                        continue
 
-        # If rule has NO cameras, we still need to run LLM if device_states are present.
-        if not cameras_video and rule.ha_devices:
-            # Use a dummy key to run the loop once
-            cameras_video[("no_camera", 0)] = None
+                    logger.error(
+                        "Invalid LLM output for camera rule %s (cam: %s ch:%s): %s",
+                        rule.name, camera_id, channel, content)
+                    continue
 
-        # Concurrently execute LLM calls
-        tasks = []
-        for (camera_id, channel), camera_img_seq in cameras_video.items():
-            messages = TriggerRuleConditionPromptBuilder.build_trigger_rule_prompt(
-                camera_img_seq, rule.condition, self._get_language(), device_states)
-            task = self._call_vision_understaning(llm_proxy, messages.get_messages())
-            tasks.append(task)
+                # HA-only path: keep legacy yes/no parsing first.
+                legacy_result = self._parse_yes_no_output(content)
+                if legacy_result is None:
+                    parsed = self._parse_llm_output(content)
+                    if parsed is None:
+                        logger.error(
+                            "Invalid LLM output for HA rule %s: %s", rule.name, content)
+                        continue
+                    legacy_result = parsed[0]
 
-        # Concurrently execute all tasks
-        responses = await asyncio.gather(*tasks, return_exceptions=True)
-
-        # Process results
-        for ((camera_id, channel),
-             camera_img_seq), response in zip(cameras_video.items(),
-                                              responses):
-            # Check for exceptions
-            if isinstance(response, Exception):
-                logger.error(
-                    "LLM call failed for rule %s (cam: %s): %s", rule.name, camera_id, response
+                condition_result_list.append(
+                    TriggerConditionResult(
+                        camera_info=None,
+                        channel=channel,
+                        result=legacy_result
+                    )
                 )
-                continue
 
-            # Ensure response is dict type before accessing
-            if not isinstance(response, dict):
-                logger.error(
-                    "Invalid response type for rule %s: %s", rule.name, type(response)
-                )
-                continue
-
-            content = response["content"]
-            logger.info(
-                "Condition result, rule name: %s, condition: %s, cam: %s, content: %s",
-                rule.name, rule.condition, camera_id, content
-            )
-
-            if not content:
-                continue
-
-            try:
-                # Use optimized helper method to extract JSON content
-                json_content = extract_json_from_content(content)
-                content_dict = json.loads(json_content)
-            except json.JSONDecodeError as e:
-                logger.error(
-                    "Failed to parse JSON. Content: %s, Error: %s", content, e)
-                continue
-            except Exception as e:  # pylint: disable=broad-except
-                logger.error("Error processing content: %s, Error: %s", content, e)
-                continue
-
-            # Construct result
-            # If it was a dummy camera, camera_info is None or dummy
-            cam_info = camera_info_dict.get(camera_id) if camera_id != "no_camera" else None
-
-            condition_result = TriggerConditionResult(
-                camera_info=cam_info,
-                channel=channel,
-                result=content_dict.get("result") == "yes"
-            )
-
-            condition_result_list.append(condition_result)
-
-        return condition_result_list
+            return condition_result_list
+        finally:
+            self._sending_states[rule.id] = SendingState(flag=False, time=time.time())
 
     def _check_camera_motion(self, camera_img_seq: CameraImgSeq) -> bool:
         """Detect motion in images"""
