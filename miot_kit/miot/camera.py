@@ -480,7 +480,8 @@ class MIoTCameraInstance:
         elif codec_id in [MIoTCameraCodec.AUDIO_OPUS, MIoTCameraCodec.AUDIO_G711A, MIoTCameraCodec.AUDIO_G711U]:
             # raw audio
             self._last_audio_codec[channel] = codec_id
-            if self._callbacks.get(f"decode_pcm.{channel}", None):
+            # Only OPUS needs decode->PCM; G711 should stay passthrough on raw audio path.
+            if codec_id == MIoTCameraCodec.AUDIO_OPUS and self._callbacks.get(f"decode_pcm.{channel}", None):
                 self._decoders[channel].push_audio_frame(frame_data)
             a_callbacks = self._callbacks.get(f"raw_audio.{channel}", {})
             for a_callback in list(a_callbacks.values()):
