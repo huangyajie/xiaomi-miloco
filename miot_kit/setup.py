@@ -30,7 +30,7 @@ setup(
         "aiohttp>=3.12.14",
         "psutil>=7.0.0",
         "pydantic>=2.4.0",
-        "fastmcp>=2.11",
+        "fastmcp>=2.11,<3",
         "zeroconf>=0.147",
         "av>=15.0",
         "pillow>=10.3.0",
