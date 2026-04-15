@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { getDeviceList, refreshMiotDevices } from '@/api';
+import { getDeviceList, getHiddenMiotDevices, hideMiotDevices, refreshMiotDevices, restoreMiotDevices } from '@/api';
 import { message } from 'antd';
 
 export const useDevices = () => {
@@ -43,9 +43,11 @@ export const useDevices = () => {
         });
         setDevices(sortedDevices || []);
       } else {
+        setDevices([]);
         setError(response.message || t('deviceManage.fetchDeviceListFailed'));
       }
     } catch (err) {
+      setDevices([]);
       setError(t('deviceManage.fetchDeviceListFailed'));
       console.error('fetchDeviceListFailed:', err);
     } finally {
@@ -64,6 +66,45 @@ export const useDevices = () => {
     setLoading(false);
   }, [fetchDevices]);
 
+  const removeDevices = useCallback(async (deviceIds) => {
+    if (!Array.isArray(deviceIds) || deviceIds.length === 0) {
+      message.warning(t('deviceManage.selectDeviceFirst'));
+      return false;
+    }
+    const res = await hideMiotDevices({ device_ids: deviceIds });
+    if (res?.code === 0) {
+      message.success(t('deviceManage.removeSuccess'));
+      await fetchDevices();
+      return true;
+    }
+    message.error(res?.message || t('deviceManage.removeFailed'));
+    return false;
+  }, [fetchDevices, t]);
+
+  const fetchHiddenDevices = useCallback(async () => {
+    const response = await getHiddenMiotDevices();
+    if (response?.code === 0) {
+      return response.data || [];
+    }
+    message.error(response?.message || t('deviceManage.fetchHiddenFailed'));
+    return [];
+  }, [t]);
+
+  const restoreDevices = useCallback(async (deviceIds) => {
+    if (!Array.isArray(deviceIds) || deviceIds.length === 0) {
+      message.warning(t('deviceManage.selectDeviceFirst'));
+      return false;
+    }
+    const res = await restoreMiotDevices({ device_ids: deviceIds });
+    if (res?.code === 0) {
+      message.success(t('deviceManage.restoreSuccess'));
+      await fetchDevices();
+      return true;
+    }
+    message.error(res?.message || t('deviceManage.restoreFailed'));
+    return false;
+  }, [fetchDevices, t]);
+
   useEffect(() => {
     fetchDevices();
   }, [fetchDevices]);
@@ -72,6 +113,9 @@ export const useDevices = () => {
     devices,
     loading,
     error,
-    refreshDevices
+    refreshDevices,
+    removeDevices,
+    fetchHiddenDevices,
+    restoreDevices
   };
 };

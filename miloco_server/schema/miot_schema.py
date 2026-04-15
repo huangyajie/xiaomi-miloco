@@ -129,3 +129,8 @@ class HAConfig(BaseModel):
     """Home Assistant configuration request"""
     base_url: str = Field(..., description="Home Assistant base URL", min_length=1)
     token: str = Field(..., description="Home Assistant access token", min_length=1)
+
+
+class DeviceIdsRequest(BaseModel):
+    """Batch device ids request."""
+    device_ids: list[str] = Field(..., description="Device ID list", min_length=1)

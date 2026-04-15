@@ -3,14 +3,39 @@
  * This software may be used and distributed according to the terms of the Xiaomi Miloco License Agreement.
  */
  
+.groupList {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding-bottom: 50px;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.groupSection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.groupHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.groupTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-color);
+}
+
 .deviceGrid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 18px;
   padding: 0;
-  padding-bottom: 50px;
-  height: 100%;
-  overflow-y: auto;
   grid-auto-rows: min-content;
 }
 

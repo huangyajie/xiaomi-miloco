@@ -7,6 +7,7 @@
   position: relative;
   border-radius: 12px;
   overflow: hidden;
+  min-height: 96px;
   &.offline {
     opacity: 0.5;
   }
@@ -18,6 +19,21 @@
   align-items: center;
   border-radius: 12px;
   overflow: hidden;
+  position: relative;
+}
+
+.selection {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 2;
+}
+
+.actions {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
 }
 
 .deviceIcon {
@@ -25,6 +41,7 @@
   display: flex;
   justify-content: center;
   margin-right: 13px;
+  margin-left: 20px;
 }
 
 .deviceImage {
@@ -65,7 +82,7 @@
 
 .deviceInfo {
   text-align: left;
-  flex: 1,
+  flex: 1;
 }
 
 .deviceName {

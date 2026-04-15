@@ -13,7 +13,7 @@ from miot.ha_api import HAAutomationInfo
 
 from miloco_server.middleware import verify_token
 from miloco_server.schema.common_schema import NormalResponse
-from miloco_server.schema.miot_schema import HAConfig, HAControlRequest
+from miloco_server.schema.miot_schema import DeviceIdsRequest, HAConfig, HAControlRequest
 from miloco_server.service.manager import get_manager
 
 logger = logging.getLogger(name=__name__)
@@ -129,6 +129,42 @@ async def get_ha_devices_grouped(current_user: str = Depends(verify_token)):
         code=0,
         message="Home Assistant grouped devices retrieved successfully",
         data=data
+    )
+
+
+@router.post(path="/devices/hide", summary="Hide Home Assistant devices", response_model=NormalResponse)
+async def hide_ha_devices(request: DeviceIdsRequest, current_user: str = Depends(verify_token)):
+    """Hide Home Assistant devices inside Miloco."""
+    logger.info("Hide HA devices API called, user: %s, count: %s", current_user, len(request.device_ids))
+    total_hidden = await manager.ha_service.hide_ha_devices(request)
+    return NormalResponse(
+        code=0,
+        message="Home Assistant devices hidden successfully",
+        data={"hidden_count": total_hidden},
+    )
+
+
+@router.get(path="/devices/hidden", summary="Get hidden Home Assistant devices", response_model=NormalResponse)
+async def get_hidden_ha_devices(current_user: str = Depends(verify_token)):
+    """Get Home Assistant devices hidden inside Miloco."""
+    logger.info("Get hidden HA devices API called, user: %s", current_user)
+    devices = await manager.ha_service.get_hidden_ha_device_list()
+    return NormalResponse(
+        code=0,
+        message="Hidden Home Assistant devices retrieved successfully",
+        data=devices,
+    )
+
+
+@router.post(path="/devices/restore", summary="Restore Home Assistant devices", response_model=NormalResponse)
+async def restore_ha_devices(request: DeviceIdsRequest, current_user: str = Depends(verify_token)):
+    """Restore Home Assistant devices inside Miloco."""
+    logger.info("Restore HA devices API called, user: %s, count: %s", current_user, len(request.device_ids))
+    total_hidden = await manager.ha_service.restore_ha_devices(request)
+    return NormalResponse(
+        code=0,
+        message="Home Assistant devices restored successfully",
+        data={"hidden_count": total_hidden},
     )
 
 

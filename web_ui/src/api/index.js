@@ -18,6 +18,9 @@ export const getUserLoginStatus = () => getApi('/api/miot/login_status');
 export const getUserInfo = () => getApi('/api/miot/user_info');
 export const getCameraList = () => getApi('/api/miot/camera_list');
 export const getDeviceList = () => getApi('/api/miot/device_list');
+export const hideMiotDevices = (data) => postApi('/api/miot/devices/hide', data);
+export const getHiddenMiotDevices = () => getApi('/api/miot/devices/hidden');
+export const restoreMiotDevices = (data) => postApi('/api/miot/devices/restore', data);
 export const getScenesList = () => getApi('/api/miot/scenes');
 export const getRefreshMiotInfo = () => getApi('/api/miot/refresh_miot_info');
 export const getMiotSceneActions = () => getApi('/api/miot/miot_scene_actions');
@@ -26,6 +29,10 @@ export const refreshMiotDevices = () => getApi('/api/miot/refresh_miot_devices')
 export const refreshMiotScenes = () => getApi('/api/miot/refresh_miot_scenes');
 export const refreshMiotCamera = () => getApi('/api/miot/refresh_miot_cameras');
 export const getRefreshMiotAllInfo = () => getApi('/api/miot/refresh_miot_all_info');
+export const getRtspCameraList = () => getApi('/api/miot/rtsp_cameras');
+export const addRtspCamera = (data) => postApi('/api/miot/rtsp_cameras', data);
+export const updateRtspCamera = (did, data) => putApi(`/api/miot/rtsp_cameras/${did}`, data);
+export const deleteRtspCamera = (did) => deleteApi(`/api/miot/rtsp_cameras/${did}`);
 
 // trigger API
 export const saveSmartRule = (data) => postApi('/api/trigger/rule', data);
@@ -55,6 +62,9 @@ export const getHaAutomationActions = () => getApi('/api/ha/automation_actions')
 export const refreshHaAutomation = () => getApi('/api/ha/refresh_ha_automations');
 export const getHADeviceList = () => getApi('/api/ha/devices');
 export const getHaDevicesGrouped = () => getApi('/api/ha/devices_grouped');
+export const hideHADevices = (data) => postApi('/api/ha/devices/hide', data);
+export const getHiddenHADevices = () => getApi('/api/ha/devices/hidden');
+export const restoreHADevices = (data) => postApi('/api/ha/devices/restore', data);
 export const controlHADevice = (data) => postApi('/api/ha/control', data);
 
 // mcp

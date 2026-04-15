@@ -5,7 +5,8 @@
 
 import json
 import logging
-from typing import Optional
+from typing import Optional, Dict, Any
+import aiohttp
 
 from pydantic_core import to_jsonable_python
 from miot.types import HAAutomationInfo, HAStateInfo
@@ -16,6 +17,7 @@ from miloco_server.schema.miot_schema import HAConfig
 
 
 logger = logging.getLogger(__name__)
+HIDDEN_HA_DEVICE_IDS_KEY = "HIDDEN_HA_DEVICE_IDS_KEY"
 
 class HAProxy:
     """Home Assistant proxy class responsible for handling Home Assistant related operations."""
@@ -122,13 +124,111 @@ class HAProxy:
             logger.warning("Failed to get states: %s", e)
             return None
 
-    async def call_service(self, domain: str, service: str, entity_id: str) -> bool:
-        """Call a service in Home Assistant"""
+    async def render_template(self, template: str) -> Optional[str]:
+        """Render a Home Assistant template with compatibility fallback."""
+        if not self._ha_rest_api:
+            return None
+        try:
+            if hasattr(self._ha_rest_api, "render_template_async"):
+                return await self._ha_rest_api.render_template_async(template)
+            http_res = await self._ha_rest_api._session.post(  # pylint: disable=protected-access
+                url=f"{self._ha_rest_api._base_url}/api/template",  # pylint: disable=protected-access
+                json={"template": template},
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {self._ha_rest_api._token}",  # pylint: disable=protected-access
+                },
+                timeout=aiohttp.ClientTimeout(total=30),
+            )
+            if http_res.status not in [200, 201]:
+                raise TypeError(f"ha api template failed, {http_res.status}")
+            return await http_res.text()
+        except Exception as e:  # pylint: disable=broad-except
+            logger.warning("Failed to render template: %s", e)
+            return None
+
+    async def get_config(self) -> Optional[dict]:
+        """Get Home Assistant config with compatibility fallback."""
+        if not self._ha_rest_api:
+            return None
+        try:
+            if hasattr(self._ha_rest_api, "get_config_async"):
+                return await self._ha_rest_api.get_config_async()
+            http_res = await self._ha_rest_api._session.get(  # pylint: disable=protected-access
+                url=f"{self._ha_rest_api._base_url}/api/config",  # pylint: disable=protected-access
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {self._ha_rest_api._token}",  # pylint: disable=protected-access
+                },
+                timeout=aiohttp.ClientTimeout(total=30),
+            )
+            if http_res.status not in [200, 201]:
+                raise TypeError(f"ha api config failed, {http_res.status}")
+            return await http_res.json()
+        except Exception as e:  # pylint: disable=broad-except
+            logger.warning("Failed to get config: %s", e)
+            return None
+
+    def get_hidden_device_ids(self) -> set[str]:
+        """Get hidden Home Assistant entity ids."""
+        raw = self._kv_dao.get(HIDDEN_HA_DEVICE_IDS_KEY, "[]") or "[]"
+        try:
+            data = json.loads(raw)
+            if isinstance(data, list):
+                return {str(item) for item in data if item}
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            logger.warning("Failed to parse hidden HA device ids: %s", exc)
+        return set()
+
+    def hide_devices(self, entity_ids: list[str]) -> int:
+        """Hide Home Assistant devices inside Miloco only."""
+        hidden = self.get_hidden_device_ids()
+        hidden.update(str(entity_id) for entity_id in entity_ids if entity_id)
+        self._kv_dao.set(HIDDEN_HA_DEVICE_IDS_KEY, json.dumps(sorted(hidden)))
+        return len(hidden)
+
+    def restore_devices(self, entity_ids: list[str]) -> int:
+        """Restore hidden Home Assistant devices inside Miloco only."""
+        hidden = self.get_hidden_device_ids()
+        hidden.difference_update(str(entity_id) for entity_id in entity_ids if entity_id)
+        self._kv_dao.set(HIDDEN_HA_DEVICE_IDS_KEY, json.dumps(sorted(hidden)))
+        return len(hidden)
+
+    async def call_service(
+        self,
+        domain: str,
+        service: str,
+        entity_id: str,
+        service_data: Optional[Dict[str, Any]] = None,
+    ) -> bool:
+        """Call a service in Home Assistant, forwarding arbitrary service_data."""
         if not self._ha_rest_api:
             logger.warning("Miot ha rest api is not initialized")
             return False
         try:
-            return await self._ha_rest_api.call_service(domain, service, entity_id)
+            payload: Dict[str, Any] = {"entity_id": entity_id}
+            if service_data:
+                payload.update(service_data)
+
+            http_res = await self._ha_rest_api._session.post(  # pylint: disable=protected-access
+                url=f"{self._ha_rest_api._base_url}/api/services/{domain}/{service}",  # pylint: disable=protected-access
+                json=payload,
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {self._ha_rest_api._token}",  # pylint: disable=protected-access
+                },
+            )
+            if http_res.status not in [200, 201]:
+                logger.warning(
+                    "Failed to call service: status=%s domain=%s service=%s entity_id=%s payload=%s",
+                    http_res.status,
+                    domain,
+                    service,
+                    entity_id,
+                    payload,
+                )
+                return False
+            return True
         except Exception as e:  # pylint: disable=broad-except
             logger.warning("Failed to call service: %s", e)
             return False
@@ -140,12 +240,14 @@ class HAProxy:
         template = """
         {
           {% for state in states %}
-            "{{ state.entity_id }}": "{{ area_name(state.entity_id) or '' }}"{% if not loop.last %},{% endif %}
+            "{{ state.entity_id }}": {{ (area_name(state.entity_id) or area_name(device_id(state.entity_id)) or '') | to_json }}{% if not loop.last %},{% endif %}
           {% endfor %}
         }
         """
         try:
-            res = await self._ha_rest_api.render_template_async(template)
+            res = await self.render_template(template)
+            if not res:
+                return None
             return json.loads(res)
         except Exception as e:  # pylint: disable=broad-except
             logger.warning("Failed to get areas: %s", e)
@@ -156,7 +258,9 @@ class HAProxy:
         if not self._ha_rest_api:
             return None
         try:
-            config = await self._ha_rest_api.get_config_async()
+            config = await self.get_config()
+            if not config:
+                return None
             return config.get("location_name")
         except Exception as e:  # pylint: disable=broad-except
             logger.warning("Failed to get location name: %s", e)

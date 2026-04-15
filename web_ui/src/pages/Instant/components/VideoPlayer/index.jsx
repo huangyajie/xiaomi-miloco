@@ -423,7 +423,7 @@ const VideoPlayer = ({ codec = 'avc1.42E01E', poster, style, cameraId, channel, 
       <canvas
         ref={canvasRef}
         style={{
-          width: '100%', height: '100%', borderRadius: 8, objectFit: 'cover',
+          width: '100%', height: '100%', borderRadius: 8, objectFit: 'contain', background: '#000',
           opacity: show ? 1 : 0, transition: 'opacity 0.4s cubic-bezier(.4,0,.2,1)'
         }}
       />
