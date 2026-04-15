@@ -1,149 +1,101 @@
 # Xiaomi Miloco (xyiqq Fork)
 
-> **🚀 Fork Deployment Notice**
-> If you need the Home Assistant, RTSP, and self-hosted UI improvements documented in this repository, deploy from this fork instead of the upstream repository.
-> **Recommended repository:** `https://github.com/xyiqq/xiaomi-miloco`
+A deployment-focused Xiaomi Miloco fork for self-hosted smart home assistants.
 
-**Xiaomi Local Copilot** is a future exploration solution for smart homes. Using Xiaomi Home cameras as the source of visual information and a self-developed LLM as its core, it connects all IoT devices throughout the house. Based on the development paradigm of LLM, it enables users to define various family needs and rules in natural language, achieving broader and more creative smart device integration.
+This repository keeps the upstream Xiaomi Miloco foundation, but treats this fork
+as the maintained deployment target for the features documented here. If you need
+the Home Assistant, RTSP, and management UI improvements in this branch, deploy
+from this repository instead of the upstream repository.
 
 <div align="center">
 
-English | [简体中文](README.zh_Hans.md)
+English | [Simplified Chinese](README.zh_Hans.md)
 
 </div>
 
-## Fork Updates
+## Why this fork
 
-- **[2026-04] v0.0.5-fork Released**:
-  - Adds public-safe deployment notes for this fork.
-  - Includes stable Home Assistant device management improvements.
-  - Includes RTSP camera add/edit/delete and persistence support.
-  - Includes device hide/restore, search, area grouping, and area bulk selection UI.
-  - Includes camera UI fixes such as 16:9 fullscreen and inline RTSP management.
+- Home Assistant device management is improved for self-hosted use.
+- Third-party RTSP cameras can be added, edited, deleted, and persisted.
+- Device management supports hide, restore, search, area grouping, and bulk actions.
+- Camera UI behavior is improved for day-to-day operation, including inline RTSP management and 16:9 fullscreen playback.
+- Public-safe deployment notes are included so the repo can be used as an actual deployment source instead of a one-off patch set.
 
-See also:
+## Current release
 
-- [Release notes](https://github.com/xyiqq/xiaomi-miloco/releases/tag/v0.0.5-fork)
-- [Changelog](CHANGELOG.md)
-- [Deployment Notes](docs/deployment/README.md)
+- Latest fork release: [`v0.0.5-fork`](https://github.com/xyiqq/xiaomi-miloco/releases/tag/v0.0.5-fork)
+- Changelog: [CHANGELOG.md](CHANGELOG.md)
+- Deployment notes: [docs/deployment/README.md](docs/deployment/README.md)
 
-## Upstream News
+## Quick deploy
 
-- **[2026-02] v0.1.7 Released**: Adds Rockchip MPP+RGA hardware acceleration for camera decoding. ([Blog](https://blog.csdn.net/h893529689/article/details/157840764?spm=1001.2014.3001.5502))
-- **[2026-01] v0.1.6 Released**: Adds configurable MIoT camera video quality and enables RTSP audio streaming. ([Blog](https://blog.csdn.net/h893529689/article/details/157588255?spm=1001.2014.3001.5502))
-- **[2026-01] v0.1.5 Released**: Supports Home Assistant devices as triggers for automation rules. ([Blog](https://blog.csdn.net/h893529689/article/details/156516910?spm=1001.2014.3001.5502))
-- **[2025-12] v0.1.4 Released**: Added comprehensive support for Home Assistant (HA) devices. ([Blog](https://blog.csdn.net/h893529689/article/details/156113974?spm=1001.2014.3001.5502))
-- **[2025-12] v0.1.3 Released**: ([Blog](https://blog.csdn.net/h893529689/article/details/155891557?spm=1001.2014.3001.5502))
-  - Support for integrating third-party RTSP cameras.
-  - Provides RTSP service capability for Xiaomi cameras.
-  - Added macOS (MPS) hardware acceleration support for AI engine.
-- [2025-11] Xiaomi Miloco Framework Open Source (Official)
-
-## Blog
-
-To help users gain a deeper understanding of the new features in this project, I have created a dedicated column for introduction:
-
-👉 **[AI Technical Column - Xiaomi Miloco Blog](https://blog.csdn.net/h893529689/category_12799372.html)**
-
-## Key Features
-
-1. New Interaction Paradigm: Based on the development paradigm of LLM, rule-setting and complex device command control can be completed through natural language interaction.
-2. On-Device LLM: The home scene tasks are split into two stages: planning and visual understanding. It provides Xiaomi's self-developed on-device model[Xiaomi MiMo-VL-Miloco-7B](https://github.com/XiaoMi/xiaomi-mimo-vl-miloco)to realize on-device video understanding and ensure family privacy and security.
-3. New Use for Visual Data: Using camera data streams as a source of perceptual information, the LLM is used to analyze various home scene events contained in the visual data to respond to user queries.
-4. Xiaomi Home Ecosystem: It connects with the Xiaomi Home ecosystem, supports the retrieval and execution of Mi Home devices and scenes, and supports sending customized content for Xiao Home notifications.
-
-    <img src="assets/images/ai_center.jpg" width="60%" />
-
-## Quick Start
-
-### System Requirements
-
-- **Hardware Requirements**
-```Plain Text
-CPU: x64 architecture
-Graphics Card: NVIDIA 30 series and above, 8GB VRAM minimum (recommended 12GB and above)
-Storage: Recommended 16GB or more available space (for local model storage)
-```
-
-- **Software Requirements**
-```Plain Text
-Operating System:
-  - Linux: x64 architecture, recommended Ubuntu 22.04 and above LTS versions
-  - Windows: x64 architecture, recommended Windows 10 and above, requires WSL2 support
-  - macOS: Apple Silicon/Intel supported via MPS/CPU (performance best on Apple Silicon)
-Docker: Version 20.10 and above, requires docker compose support
-NVIDIA Driver: NVIDIA driver with CUDA support
-NVIDIA Container Toolkit: For Docker GPU support
-```
-
-### Install
-
-> **Note**: Please ensure your system meets the above hardware and software requirements. Windows systems need to enter the WSL environment.
-
-**Install with Docker**  
-One-click installation via command line
-```bash
-bash -c "$(wget -qO- https://xiaomi-miloco.cnbj1.mi-fds.com/xiaomi-miloco/install.sh)"
-```
-Or download the source code first, then execute the one-click installation script:
 ```bash
 git clone https://github.com/xyiqq/xiaomi-miloco.git
-
+cd xiaomi-miloco
 bash scripts/install.sh
 ```
-For fork-specific deployment guidance, please refer to [Deployment Notes](docs/deployment/README.md) first, then the [Docker Deployment Documentation](docs/environment-setup.md).
 
-**Install with source code**  
-For source code installation steps, please refer to the [Development Guide](docs/development/developer-setup.md).
+For self-hosted deployment, read these first:
 
-## Usage Documentation
+1. [docs/deployment/README.md](docs/deployment/README.md)
+2. [docs/deployment/fork-customizations.md](docs/deployment/fork-customizations.md)
+3. [docs/environment-setup.md](docs/environment-setup.md)
 
-Please refer to the [Usage Documentation](docs/usage/README.md).
+## Fork highlights
 
-## Changelog
+### Home Assistant
 
-Please refer to [CHANGELOG.md](CHANGELOG.md).
+- Device list and grouped device flows
+- Better area resolution in device management
+- Hidden-device and restore flows
+- Correct forwarding of `service_data` for device control
 
-## Contributing
+### RTSP cameras
 
-Please refer to the [Contributing Guide](CONTRIBUTING.md).
+- Add, edit, delete, and list RTSP cameras
+- Runtime persistence for RTSP camera configuration
+- Inline RTSP management from the camera list
+- Edit behavior that keeps the current URL when the field is left blank
+
+### Device management UI
+
+- Search by name, ID, model, and area
+- Group by area or home
+- Per-area bulk selection
+- Batch remove and hidden-device restore flows
+
+### Camera UI
+
+- Inline edit and delete actions for RTSP cameras
+- Cleaner camera card presentation
+- 16:9 fullscreen playback instead of aggressive cropping
+
+## Documentation
+
+- Deployment notes: [docs/deployment/README.md](docs/deployment/README.md)
+- Fork customizations: [docs/deployment/fork-customizations.md](docs/deployment/fork-customizations.md)
+- Changelog: [CHANGELOG.md](CHANGELOG.md)
+- Usage docs: [docs/usage/README.md](docs/usage/README.md)
+- Development setup: [docs/development/developer-setup.md](docs/development/developer-setup.md)
+
+## Relationship to upstream
+
+This fork is based on the upstream Xiaomi Miloco project and keeps its core
+concepts, architecture, and license terms. Upstream remains the original source
+of the framework. This fork exists to provide a maintained, deployable branch
+for the self-hosted integrations and UI/runtime fixes documented here.
+
+If you need the upstream project itself, see:
+
+- Upstream repository: [XiaoMi/xiaomi-miloco](https://github.com/XiaoMi/xiaomi-miloco)
+
+## Support
+
+- Issues: [xyiqq/xiaomi-miloco issues](https://github.com/xyiqq/xiaomi-miloco/issues)
+- Discussions: [xyiqq/xiaomi-miloco discussions](https://github.com/xyiqq/xiaomi-miloco/discussions)
 
 ## License
 
-For license details, please see [LICENSE.md](LICENSE.md).
+License details are in [LICENSE.md](LICENSE.md).
 
-**Important Notice**: This project is limited to non-commercial use only. Without written authorization from Xiaomi Corporation, this project may not be used for developing applications, web services, or other forms of software.
-
-## Security Issues
-
-If you discover potential security issues in this project, or believe you may have found a security issue, please notify the [Miloco Team](xiaomi-miloco@xiaomi.com) via our vulnerability reporting email. Please do not create public GitHub Issues.
-
-## Contact Us
-
-### Issue Reporting
-
-For issue reporting, please participate through the following methods:
-- Submit a [GitHub Issue](https://github.com/xyiqq/xiaomi-miloco/issues/new/)
-
-### Technical Discussion
-
-- GitHub [Discussions](https://github.com/xyiqq/xiaomi-miloco/discussions/)
-- Project Discussion Group (WeChat、Lark):
-
-  <img src="assets/images/miloco_feishu.jpeg" width="45%" />
-  <img src="assets/images/miloco_wechat_latest.png" width="45%" />
-
-
-
-### Join Us
-
-The **Xiaomi Miloco** team is hiring. Send your resume to `xiaomi-miloco@xiaomi.com`, and it will be delivered directly to the project lead.
-
-## Acknowledgments
-
-Thank you to the original team members who worked hard for Miloco：zhaoy、yangyongjie、xx、Changyu、yyk、junhui、郭兴宝、47、afei。
-
-Your passion and talent are the fundamental driving force behind Miloco's continuous innovation and progress.
-
-Special thanks to:
-- The [llama.cpp](https://github.com/ggml-org/llama.cpp) open source project for providing inference backend capabilities
+This project continues to follow the upstream non-commercial license notice.
