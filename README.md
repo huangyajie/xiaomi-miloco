@@ -1,8 +1,8 @@
-# Xiaomi Miloco (Personal Fork)
+# Xiaomi Miloco (xyiqq Fork)
 
-> **🚀 Personal Fork Note**
-> This branch is an actively maintained version by the developer, dedicated to faster feature iterations and bug fixes.
-> **Key Enhancements:** Full support for Home Assistant integration, RTSP camera support, Rockchip (MPP+RGA) acceleration, and macOS (MPS) acceleration.
+> **🚀 Fork Deployment Notice**
+> If you need the Home Assistant, RTSP, and self-hosted UI improvements documented in this repository, deploy from this fork instead of the upstream repository.
+> **Recommended repository:** `https://github.com/xyiqq/xiaomi-miloco`
 
 **Xiaomi Local Copilot** is a future exploration solution for smart homes. Using Xiaomi Home cameras as the source of visual information and a self-developed LLM as its core, it connects all IoT devices throughout the house. Based on the development paradigm of LLM, it enables users to define various family needs and rules in natural language, achieving broader and more creative smart device integration.
 
@@ -12,7 +12,16 @@ English | [简体中文](README.zh_Hans.md)
 
 </div>
 
-## News
+## Fork Updates
+
+- **[2026-04] v0.0.5-fork Released**:
+  - Adds public-safe deployment notes for this fork.
+  - Includes stable Home Assistant device management improvements.
+  - Includes RTSP camera add/edit/delete and persistence support.
+  - Includes device hide/restore, search, area grouping, and area bulk selection UI.
+  - Includes camera UI fixes such as 16:9 fullscreen and inline RTSP management.
+
+## Upstream News
 
 - **[2026-02] v0.1.7 Released**: Adds Rockchip MPP+RGA hardware acceleration for camera decoding. ([Blog](https://blog.csdn.net/h893529689/article/details/157840764?spm=1001.2014.3001.5502))
 - **[2026-01] v0.1.6 Released**: Adds configurable MIoT camera video quality and enables RTSP audio streaming. ([Blog](https://blog.csdn.net/h893529689/article/details/157588255?spm=1001.2014.3001.5502))
@@ -72,11 +81,11 @@ bash -c "$(wget -qO- https://xiaomi-miloco.cnbj1.mi-fds.com/xiaomi-miloco/instal
 ```
 Or download the source code first, then execute the one-click installation script:
 ```bash
-git clone https://github.com/XiaoMi/xiaomi-miloco.git
+git clone https://github.com/xyiqq/xiaomi-miloco.git
 
 bash scripts/install.sh
 ```
-For detailed installation steps, please refer to the [Docker Deployment Documentation](docs/environment-setup.md).
+For fork-specific deployment guidance, please refer to [Deployment Notes](docs/deployment/README.md) first, then the [Docker Deployment Documentation](docs/environment-setup.md).
 
 **Install with source code**  
 For source code installation steps, please refer to the [Development Guide](docs/development/developer-setup.md).
@@ -104,11 +113,11 @@ If you discover potential security issues in this project, or believe you may ha
 ### Issue Reporting
 
 For issue reporting, please participate through the following methods:
-- Submit a [GitHub Issue](https://github.com/XiaoMi/xiaomi-miloco/issues/new/)
+- Submit a [GitHub Issue](https://github.com/xyiqq/xiaomi-miloco/issues/new/)
 
 ### Technical Discussion
 
-- GitHub [Discussions](https://github.com/XiaoMi/xiaomi-miloco/discussions/)
+- GitHub [Discussions](https://github.com/xyiqq/xiaomi-miloco/discussions/)
 - Project Discussion Group (WeChat、Lark):
 
   <img src="assets/images/miloco_feishu.jpeg" width="45%" />

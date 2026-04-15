@@ -14,7 +14,7 @@
 
 ### 报告问题
 
-如果您在项目中遇到错误，请在 GitHub 上[报告问题](https://github.com/XiaoMi/xiaomi-miloco/issues/new/)，并提供关于错误的详细信息，包括复现步骤、 debug 级日志以及错误出现的时间。
+如果您在这个 fork 中遇到错误，请在 GitHub 上[报告问题](https://github.com/xyiqq/xiaomi-miloco/issues/new/)，并提供关于错误的详细信息，包括复现步骤、 debug 级日志以及错误出现的时间。
 
 - 打开 debug 日志方法
   - 主服务：

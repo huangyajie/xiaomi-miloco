@@ -1,8 +1,8 @@
-# Xiaomi Miloco (Personal Fork)
+# Xiaomi Miloco (xyiqq Fork)
 
-> **🚀 个人维护版说明**
-> 本分支是由开发者个人维护的活跃版本，致力于更快的特性迭代和问题修复。
-> **主要增强：** 全面支持 Home Assistant 接入、RTSP 摄像头集成、Rockchip (MPP+RGA) 加速以及 macOS (MPS) 加速。
+> **🚀 Fork 部署说明**
+> 如果你需要这个仓库里已经整理好的 Home Assistant、RTSP 和自托管界面增强能力，请直接使用这个 fork 部署，不要再按上游原仓库部署。
+> **推荐仓库：** `https://github.com/xyiqq/xiaomi-miloco`
 
 智能家居未来探索方案 **Xiaomi Local Copilot** ，以米家摄像机为视觉信息来源，以自研大模型为核心，打通全屋 IoT 设备。基于大模型的开发范式，让用户能够以自然语言定义家庭的各种需求和规则，实现更广泛、更具创意的智能联动。
 
@@ -12,7 +12,16 @@
 
 </div>
 
-## 最新动态
+## Fork 更新
+
+- **[2026-04] v0.0.5-fork 发布**：
+  - 增加了这个 fork 的公开部署说明。
+  - 纳入了稳定的 Home Assistant 设备管理增强。
+  - 纳入了 RTSP 摄像头新增、编辑、删除与持久化支持。
+  - 纳入了设备隐藏/恢复、搜索、按区域分组、区域批量选择界面。
+  - 纳入了摄像头 16:9 全屏显示和 RTSP 内联管理修复。
+
+## 上游动态
 
 - **[2026-02] v0.1.7 发布**：新增 Rockchip MPP+RGA 硬件加速，用于摄像头解码。（[博客](https://blog.csdn.net/h893529689/article/details/157840764?spm=1001.2014.3001.5502)）
 - **[2026-01] v0.1.6 发布**：新增米家摄像头清晰度配置，并启用 RTSP 音频传输。（[博客](https://blog.csdn.net/h893529689/article/details/157588255?spm=1001.2014.3001.5502)）
@@ -72,11 +81,11 @@ bash -c "$(wget -qO- https://xiaomi-miloco.cnbj1.mi-fds.com/xiaomi-miloco/instal
 ```
 或下载源码后，执行一键安装脚本
 ```bash
-git clone https://github.com/XiaoMi/xiaomi-miloco.git
+git clone https://github.com/xyiqq/xiaomi-miloco.git
 
 bash scripts/install.sh
 ```
-详细的安装步骤请参考 [Docker部署文档](docs/environment-setup_zh-Hans.md)。
+部署这个 fork 时，建议先看 [部署说明](docs/deployment/README.md)，再看 [Docker部署文档](docs/environment-setup_zh-Hans.md)。
 
 **源码安装**  
 源码安装步骤请参考 [开发指南](docs/development/developer-setup_zh_Hans.md)。
@@ -103,11 +112,11 @@ bash scripts/install.sh
 ### 问题反馈
 
 如有问题反馈，请通过以下方式参与：
-- 提交 [GitHub Issue](https://github.com/XiaoMi/xiaomi-miloco/issues/new/)
+- 提交 [GitHub Issue](https://github.com/xyiqq/xiaomi-miloco/issues/new/)
 
 ### 技术交流讨论
 
-- GitHub 的[讨论区](https://github.com/XiaoMi/xiaomi-miloco/discussions/)
+- GitHub 的[讨论区](https://github.com/xyiqq/xiaomi-miloco/discussions/)
 - 项目讨论群（微信、飞书）：
 
   <img src="assets/images/miloco_feishu.jpeg" width="45%" />

@@ -2,6 +2,8 @@
 
 This directory contains public-safe deployment notes for this fork.
 
+If you want the fixes documented here, deploy from `https://github.com/xyiqq/xiaomi-miloco` instead of the upstream repository.
+
 ## Recommended reading order
 
 1. `../environment-setup.md`

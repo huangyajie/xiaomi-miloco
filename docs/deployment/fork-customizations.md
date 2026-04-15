@@ -5,6 +5,8 @@ validated on a self-hosted Docker deployment. Sensitive runtime information
 such as IP addresses, tokens, passwords, and camera credentials has been
 removed from this document and is not part of the repository changes.
 
+If you need the capabilities listed here, deploy from `https://github.com/xyiqq/xiaomi-miloco` instead of the upstream repository.
+
 ## Included changes
 
 ### Home Assistant

@@ -3,6 +3,8 @@
 这个 fork 包含一组面向自托管 Docker 部署的修复与界面增强。这份文档已经去除了
 所有敏感运行信息，不包含本地 IP、Token、密码或摄像头凭据。
 
+如果你需要这里列出的这些能力，请直接部署 `https://github.com/xyiqq/xiaomi-miloco`，不要再按上游原仓库部署。
+
 ## 已包含的变动
 
 ### Home Assistant
