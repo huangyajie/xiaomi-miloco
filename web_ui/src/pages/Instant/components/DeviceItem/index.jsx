@@ -4,8 +4,10 @@
  */
 
 import React, { useState, useCallback, useMemo, useRef } from 'react'
+import { Button, Popconfirm } from 'antd';
 import { message } from 'antd';
 import { useTranslation } from 'react-i18next';
+import { DeleteOutlined, EditOutlined } from '@ant-design/icons';
 import { Icon } from '@/components';
 import DefaultCameraBg from '@/assets/images/default-camera-bg.png'
 import VideoPlayer from '../VideoPlayer/index'
@@ -22,7 +24,7 @@ import styles from './index.module.less'
  * @param {boolean} props.playing - Whether the device is currently playing
  * @returns {JSX.Element} Device item component
  */
-const DeviceItem = ({ item, onPlay, playing }) => {
+const DeviceItem = ({ item, onPlay, playing, onEdit, onDelete }) => {
   const [showVideo, setShowVideo] = useState(false)
   const [channel, setChannel] = useState(0)
   const [showVideoModal, setShowVideoModal] = useState(false)
@@ -79,6 +81,10 @@ const DeviceItem = ({ item, onPlay, playing }) => {
 
     )
   }, [item.channel, channel, t])
+
+  const secondaryText = item.source === 'rtsp'
+    ? ''
+    : (item.room_name || '');
 
 
   const PlayView = ({ item }) => {
@@ -152,13 +158,47 @@ const DeviceItem = ({ item, onPlay, playing }) => {
         )
       }
       <div className={styles.itemContent}>
+        {item.source === 'rtsp' && (
+          <div className={styles.actionGroup}>
+            <Button
+              type="text"
+              size="small"
+              icon={<EditOutlined />}
+              className={styles.actionButton}
+              onClick={(event) => {
+                event.stopPropagation();
+                onEdit?.(item);
+              }}
+            />
+            <Popconfirm
+              title={t('instant.deviceList.deleteRtspConfirm')}
+              onConfirm={(event) => {
+                event?.stopPropagation?.();
+                onDelete?.(item);
+              }}
+              okText={t('common.confirm')}
+              cancelText={t('common.cancel')}
+            >
+              <Button
+                type="text"
+                size="small"
+                danger
+                icon={<DeleteOutlined />}
+                className={styles.actionButton}
+                onClick={(event) => event.stopPropagation()}
+              />
+            </Popconfirm>
+          </div>
+        )}
         <div className={styles.itemContentWrap}>
           <div className={styles.info}>
             <div className={styles.infoTop}>
               <div className={styles.top}>
-                <div className={`${styles.name} ${playing ? styles.playColor : ''}`}>{item.room_name || t('instant.deviceList.noDevice')}</div>
+                <div className={`${styles.name} ${playing ? styles.playColor : ''}`}>{item.name || t('instant.deviceList.noDevice')}</div>
               </div>
-              <div className={`${styles.bottom} ${playing ? styles.playColor : ''}`}>{item.name || t('instant.deviceList.noDevice')}</div>
+              {secondaryText && (
+                <div className={`${styles.bottom} ${playing ? styles.playColor : ''}`}>{secondaryText}</div>
+              )}
             </div>
           </div>
           {
@@ -194,7 +234,6 @@ const DeviceItem = ({ item, onPlay, playing }) => {
         onClose={handleCloseVideoModal}
         sourceCanvasRef={canvasRef}
         deviceInfo={{
-          room_name: item.room_name,
           name: item.name
         }}
         channelCount={item.channel_count}

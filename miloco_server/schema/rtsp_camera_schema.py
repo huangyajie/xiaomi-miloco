@@ -5,6 +5,7 @@ RTSP camera schema definitions.
 Used for loading and validating RTSP camera configuration from server_config.yaml.
 """
 
+import re
 from typing import Optional
 from pydantic import BaseModel, Field
 
@@ -55,5 +56,42 @@ class RtspCameraConfig(BaseModel):
             room_name=self.room_name,
             vendor=self.vendor,
             model=self.model or "rtsp_camera",
+            icon=self.icon,
+        )
+
+
+class RtspCameraCreateRequest(BaseModel):
+    """RTSP camera create request for UI/API usage."""
+
+    did: Optional[str] = Field(default=None, description="Optional camera unique id")
+    name: str = Field(..., description="Camera display name")
+    rtsp_url: str = Field(..., description="RTSP url with optional credentials")
+    codec: Optional[str] = Field(default=None, description="Codec hint, h264 | h265 | auto")
+    enable_audio: bool = Field(default=False, description="Enable audio decoding")
+    transport: Optional[str] = Field(default="tcp", description="Transport protocol: tcp or udp")
+    home_name: Optional[str] = Field(default="Third Party", description="Home/area name")
+    room_name: Optional[str] = Field(default="RTSP Cameras", description="Room name")
+    vendor: Optional[str] = Field(default=None, description="Vendor or brand name")
+    model: Optional[str] = Field(default="rtsp_camera", description="Model name for display")
+    icon: Optional[str] = Field(default=None, description="Icon url or path")
+
+    def _generate_did(self) -> str:
+        base = self.did or self.name or self.rtsp_url
+        normalized = re.sub(r"[^a-zA-Z0-9]+", "_", base).strip("_").lower()
+        normalized = normalized[:48] if normalized else "rtsp_camera"
+        return normalized if normalized.startswith("rtsp_") else f"rtsp_{normalized}"
+
+    def to_config(self, did_override: Optional[str] = None) -> RtspCameraConfig:
+        return RtspCameraConfig(
+            did=did_override or self._generate_did(),
+            name=self.name,
+            rtsp_url=self.rtsp_url,
+            codec=self.codec,
+            enable_audio=self.enable_audio,
+            transport=self.transport,
+            home_name=self.home_name,
+            room_name=self.room_name,
+            vendor=self.vendor,
+            model=self.model,
             icon=self.icon,
         )

@@ -14,7 +14,7 @@ Before you start contributing, please take a moment to read the following guidel
 
 ### Reporting Issues
 
-If you encounter an error in the project, please [report an issue](https://github.com/XiaoMi/xiaomi-miloco/issues/new/) on GitHub and provide detailed information about the error, including reproduction steps, debug-level logs, and the time when the error occurred.
+If you encounter an error in this fork, please [report an issue](https://github.com/xyiqq/xiaomi-miloco/issues/new/) on GitHub and provide detailed information about the error, including reproduction steps, debug-level logs, and the time when the error occurred.
 
 - How to enable debug logging
   - Main service:

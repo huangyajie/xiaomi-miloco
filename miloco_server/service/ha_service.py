@@ -16,7 +16,7 @@ from miloco_server.middleware.exceptions import (
     BusinessException
 )
 from miloco_server.proxy.ha_proxy import HAProxy
-from miloco_server.schema.miot_schema import HAConfig, HADeviceInfo, HAControlRequest
+from miloco_server.schema.miot_schema import HAConfig, HAControlRequest, DeviceIdsRequest, HADeviceInfo
 from miloco_server.schema.trigger_schema import Action
 from miloco_server.utils.default_action import DefaultPresetActionManager
 from miloco_server.mcp.mcp_client import LocalMCPConfig, TransportType
@@ -244,6 +244,44 @@ class HaService:
         # 4. Default generic icon
         return "menuDevice"
 
+    async def _get_ha_entity_area_map(self) -> Dict[str, str]:
+        """Build entity -> area map from HA device grouping template."""
+        if not self.ha_client:
+            return {}
+
+        template = """
+        {
+          {% set ns = namespace(devices=[]) %}
+          {% for state in states %}
+            {% set dev_id = device_id(state.entity_id) %}
+            {% if dev_id %}
+              {% set ns.devices = ns.devices + [dev_id] %}
+            {% endif %}
+          {% endfor %}
+          {% set unique_devices = ns.devices | unique | list %}
+          {% for dev_id in unique_devices %}
+            "{{ dev_id }}": {
+              "area": {{ (area_name(dev_id) or '') | to_json }},
+              "entities": {{ device_entities(dev_id) | list | to_json }}
+            }{% if not loop.last %},{% endif %}
+          {% endfor %}
+        }
+        """
+        try:
+            res = await self._ha_proxy.render_template(template)
+            if not res:
+                return {}
+            grouped = json.loads(res)
+            entity_area_map = {}
+            for device_info in grouped.values():
+                area_name = device_info.get("area") or ""
+                for entity_id in device_info.get("entities", []):
+                    entity_area_map[entity_id] = area_name
+            return entity_area_map
+        except Exception as e:  # pylint: disable=broad-except
+            logger.error("Failed to build HA entity area map: %s", e)
+            return {}
+
     async def get_ha_devices_grouped(self) -> Dict[str, Dict[str, Any]]:
         """
         Get HA devices grouped by device ID using templates.
@@ -253,6 +291,7 @@ class HaService:
         if not self.ha_client:
             logger.debug("HA client not initialized, skipping get_ha_devices_grouped")
             return {}
+        hidden_entity_ids = self._ha_proxy.get_hidden_device_ids()
 
         template = """
         {
@@ -275,12 +314,23 @@ class HaService:
         }
         """
         try:
-            res = await self._ha_proxy.ha_client.render_template_async(template)
+            res = await self._ha_proxy.render_template(template)
+            if not res:
+                return {}
             devices = json.loads(res)
+            filtered_devices = {}
+            for device_id, info in devices.items():
+                entities = [entity_id for entity_id in info.get("entities", []) if entity_id not in hidden_entity_ids]
+                if not entities:
+                    continue
+                filtered_devices[device_id] = {
+                    **info,
+                    "entities": entities,
+                }
 
             # Sort devices: those with area first, then alphabetical by area and name
             sorted_items = sorted(
-                devices.items(),
+                filtered_devices.items(),
                 key=lambda x: (
                     0 if x[1].get("area") else 1,  # Has area comes first
                     (x[1].get("area") or "").lower(),
@@ -288,9 +338,36 @@ class HaService:
                 )
             )
 
-            return dict(sorted_items)
+            grouped = dict(sorted_items)
+            if grouped:
+                return grouped
         except Exception as e:  # pylint: disable=broad-except
             logger.error("Failed to get grouped HA devices: %s", e)
+
+        # Fallback: if HA device registry grouping is unavailable, expose each
+        # entity as its own selectable item so the frontend can still list HA
+        # entities instead of showing an empty selector.
+        try:
+            devices = await self.get_ha_device_list()
+            fallback = {
+                device.entity_id: {
+                    "name": device.name,
+                    "area": device.room_name or "",
+                    "entities": [device.entity_id],
+                }
+                for device in devices
+            }
+            sorted_items = sorted(
+                fallback.items(),
+                key=lambda x: (
+                    0 if x[1].get("area") else 1,
+                    (x[1].get("area") or "").lower(),
+                    (x[1].get("name") or "").lower(),
+                ),
+            )
+            return dict(sorted_items)
+        except Exception as e:  # pylint: disable=broad-except
+            logger.error("Failed to build fallback HA grouped devices: %s", e)
             return {}
 
     async def get_ha_device_list(self) -> List[HADeviceInfo]:
@@ -300,7 +377,8 @@ class HaService:
             if states is None:
                 logger.warning("Failed to get Home Assistant device list")
                 return []
-            areas = await self._ha_proxy.get_all_areas() or {}
+            hidden_entity_ids = self._ha_proxy.get_hidden_device_ids()
+            entity_area_map = await self._get_ha_entity_area_map()
             location_name = await self._ha_proxy.get_location_name() or ""
             ha_config = self._ha_proxy.get_ha_config()
             base_url = ha_config.base_url if ha_config else ""
@@ -308,6 +386,8 @@ class HaService:
             device_list = []
 
             for entity_id, state_info in states.items():
+                if entity_id in hidden_entity_ids:
+                    continue
                 is_online = state_info.state not in ["unavailable", "unknown"]
                 supported_features = state_info.attributes.get("supported_features", 0)
 
@@ -318,7 +398,7 @@ class HaService:
                     model=state_info.domain,
                     icon=self._get_icon_for_ha_device(state_info, base_url),
                     home_name=location_name,
-                    room_name=areas.get(entity_id, ""),
+                    room_name=entity_area_map.get(entity_id, ""),
                     entity_id=entity_id,
                     state=state_info.state,
                     attributes=state_info.attributes,
@@ -340,13 +420,84 @@ class HaService:
             logger.error("Failed to get Home Assistant device list: %s", e)
             raise HaServiceException(f"Failed to get Home Assistant device list: {str(e)}") from e
 
+    async def hide_ha_devices(self, request: DeviceIdsRequest) -> int:
+        """Hide Home Assistant devices inside Miloco only."""
+        try:
+            return self._ha_proxy.hide_devices(request.device_ids)
+        except Exception as e:  # pylint: disable=broad-except
+            logger.error("Failed to hide Home Assistant devices: %s", e)
+            raise HaServiceException(f"Failed to hide Home Assistant devices: {str(e)}") from e
+
+    async def get_hidden_ha_device_list(self) -> List[HADeviceInfo]:
+        """Get Home Assistant devices hidden inside Miloco."""
+        try:
+            hidden_entity_ids = self._ha_proxy.get_hidden_device_ids()
+            if not hidden_entity_ids:
+                return []
+
+            states = await self._ha_proxy.get_states() or {}
+            entity_area_map = await self._get_ha_entity_area_map()
+            location_name = await self._ha_proxy.get_location_name() or ""
+            ha_config = self._ha_proxy.get_ha_config()
+            base_url = ha_config.base_url if ha_config else ""
+
+            device_list = []
+            for entity_id in hidden_entity_ids:
+                state_info = states.get(entity_id)
+                if state_info:
+                    is_online = state_info.state not in ["unavailable", "unknown"]
+                    supported_features = state_info.attributes.get("supported_features", 0)
+                    device_info = HADeviceInfo(
+                        did=entity_id,
+                        name=state_info.attributes.get("friendly_name") or entity_id,
+                        online=is_online,
+                        model=state_info.domain,
+                        icon=self._get_icon_for_ha_device(state_info, base_url),
+                        home_name=location_name,
+                        room_name=entity_area_map.get(entity_id, ""),
+                        entity_id=entity_id,
+                        state=state_info.state,
+                        attributes=state_info.attributes,
+                        supported_features=supported_features,
+                    )
+                else:
+                    device_info = HADeviceInfo(
+                        did=entity_id,
+                        name=entity_id,
+                        online=False,
+                        model="unknown",
+                        icon="menuDevice",
+                        home_name=location_name,
+                        room_name="",
+                        entity_id=entity_id,
+                        state="unknown",
+                        attributes={},
+                        supported_features=0,
+                    )
+                device_list.append(device_info)
+
+            device_list.sort(key=lambda x: ((x.room_name or "").lower(), x.name.lower()))
+            return device_list
+        except Exception as e:  # pylint: disable=broad-except
+            logger.error("Failed to get hidden Home Assistant devices: %s", e)
+            raise HaServiceException(f"Failed to get hidden Home Assistant devices: {str(e)}") from e
+
+    async def restore_ha_devices(self, request: DeviceIdsRequest) -> int:
+        """Restore hidden Home Assistant devices inside Miloco only."""
+        try:
+            return self._ha_proxy.restore_devices(request.device_ids)
+        except Exception as e:  # pylint: disable=broad-except
+            logger.error("Failed to restore Home Assistant devices: %s", e)
+            raise HaServiceException(f"Failed to restore Home Assistant devices: {str(e)}") from e
+
     async def control_ha_device(self, control_req: HAControlRequest):
         """Control Home Assistant device"""
         try:
             result = await self._ha_proxy.call_service(
                 domain=control_req.domain,
                 service=control_req.service,
-                entity_id=control_req.entity_id
+                entity_id=control_req.entity_id,
+                service_data=control_req.service_data,
             )
             if not result:
                 raise HaServiceException("Failed to control Home Assistant device")

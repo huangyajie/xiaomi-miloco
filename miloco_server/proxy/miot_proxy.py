@@ -8,7 +8,9 @@ import copy
 import json
 import logging
 import time
+from pathlib import Path
 from typing import Callable, Coroutine, Optional
+import yaml
 
 from pydantic_core import to_jsonable_python
 from miot.client import MIoTClient
@@ -28,7 +30,7 @@ from miot.rtsp_server import RtspServer
 from miloco_server.config import MIOT_CACHE_DIR, CAMERA_CONFIG, RTSP_CAMERA_CONFIG, RTSP_SERVER_CONFIG
 from miloco_server.dao.kv_dao import AuthConfigKeys, KVDao, DeviceInfoKeys
 from miloco_server.schema.miot_schema import CameraImgSeq
-from miloco_server.schema.rtsp_camera_schema import RtspCameraConfig
+from miloco_server.schema.rtsp_camera_schema import RtspCameraConfig, RtspCameraCreateRequest
 from miloco_server.utils.carmera_vision_handler import (
     CameraVisionHandler,
     RTSPEnabledCameraVisionHandler,
@@ -38,6 +40,9 @@ from miloco_server.utils.carmera_vision_handler import (
 
 
 logger = logging.getLogger(__name__)
+SERVER_CONFIG_PATH = Path("/app/config/server_config.yaml")
+HIDDEN_MIOT_DEVICE_IDS_KEY = "HIDDEN_MIOT_DEVICE_IDS_KEY"
+RTSP_CAMERA_CONFIGS_KEY = "RTSP_CAMERA_CONFIGS_KEY"
 
 class MiotProxy:
     """Xiaomi IoT proxy class responsible for handling MIoT device related operations."""
@@ -67,6 +72,11 @@ class MiotProxy:
             cfg if isinstance(cfg, RtspCameraConfig) else RtspCameraConfig.model_validate(cfg)
             for cfg in (rtsp_cameras or RTSP_CAMERA_CONFIG or [])
         ]
+        persisted_rtsp_configs = self._load_persisted_rtsp_camera_configs()
+        if persisted_rtsp_configs is not None:
+            self._rtsp_camera_configs = persisted_rtsp_configs
+        elif self._rtsp_camera_configs:
+            self._save_rtsp_camera_configs_to_kv()
 
         # two times cache ttl, at least 1 second
         # frame_interval * cache_max_size / 1000 * 2 = seconds
@@ -80,8 +90,6 @@ class MiotProxy:
             cache_path=str(MIOT_CACHE_DIR),
             oauth_info=self._oauth_info,
             cloud_server=cloud_server,
-            enable_hw_accel=self._hw_accel_enabled,
-            hw_accel_backend=self._hw_accel_backend,
         )
 
         # Initialize RTSP Server
@@ -105,13 +113,144 @@ class MiotProxy:
                 self._rtsp_camera_client = RTSPCamera(
                     frame_interval=self._frame_interval,
                     enable_hw_accel=self._hw_accel_enabled,
-                    hw_accel_backend=self._hw_accel_backend,
                 )
                 logger.info("RTSP camera client initialized")
             except FileNotFoundError as exc:
                 logger.warning("RTSP library not found, will mark RTSP cameras offline: %s", exc)
             except Exception as exc:  # pylint: disable=broad-exception-caught
                 logger.error("Failed to initialize RTSP camera client: %s", exc, exc_info=True)
+
+    def list_rtsp_camera_configs(self) -> list[dict]:
+        """Return current RTSP camera configuration list."""
+        return [cfg.model_dump(exclude_none=True) for cfg in self._rtsp_camera_configs]
+
+    def _load_persisted_rtsp_camera_configs(self) -> Optional[list[RtspCameraConfig]]:
+        if not self._kv_dao.exists(RTSP_CAMERA_CONFIGS_KEY):
+            return None
+        raw = self._kv_dao.get(RTSP_CAMERA_CONFIGS_KEY, "[]") or "[]"
+        try:
+            data = json.loads(raw)
+            if isinstance(data, list):
+                return [RtspCameraConfig.model_validate(item) for item in data]
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            logger.warning("Failed to load persisted RTSP camera configs: %s", exc)
+        return None
+
+    def _save_rtsp_camera_configs_to_kv(self) -> None:
+        self._kv_dao.set(
+            RTSP_CAMERA_CONFIGS_KEY,
+            json.dumps([cfg.model_dump(exclude_none=True) for cfg in self._rtsp_camera_configs], ensure_ascii=False),
+        )
+
+    def _get_hidden_device_ids(self) -> set[str]:
+        raw = self._kv_dao.get(HIDDEN_MIOT_DEVICE_IDS_KEY, "[]") or "[]"
+        try:
+            data = json.loads(raw)
+            if isinstance(data, list):
+                return {str(item) for item in data if item}
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            logger.warning("Failed to load hidden MiOT device ids: %s", exc)
+        return set()
+
+    def _save_hidden_device_ids(self, device_ids: set[str]) -> None:
+        self._kv_dao.set(HIDDEN_MIOT_DEVICE_IDS_KEY, json.dumps(sorted(device_ids)))
+
+    def hide_devices(self, device_ids: list[str]) -> int:
+        """Hide devices from Miloco device surfaces only."""
+        hidden = self._get_hidden_device_ids()
+        hidden.update(str(device_id) for device_id in device_ids if device_id)
+        self._save_hidden_device_ids(hidden)
+        return len(hidden)
+
+    def list_hidden_devices(self) -> dict[str, MIoTDeviceInfo]:
+        """List MiOT devices hidden inside Miloco."""
+        hidden = self._get_hidden_device_ids()
+        return {
+            did: device
+            for did, device in self._device_info_dict.items()
+            if did in hidden
+        }
+
+    def restore_devices(self, device_ids: list[str]) -> int:
+        """Restore hidden MiOT devices inside Miloco."""
+        hidden = self._get_hidden_device_ids()
+        hidden.difference_update(str(device_id) for device_id in device_ids if device_id)
+        self._save_hidden_device_ids(hidden)
+        return len(hidden)
+
+    def _persist_rtsp_camera_configs(self) -> None:
+        """Persist current RTSP camera configuration list back to server_config.yaml."""
+        if not SERVER_CONFIG_PATH.exists():
+            raise FileNotFoundError(f"server config not found: {SERVER_CONFIG_PATH}")
+
+        with open(SERVER_CONFIG_PATH, "r", encoding="utf-8") as f:
+            config = yaml.safe_load(f) or {}
+
+        config["rtsp_cameras"] = [cfg.model_dump(exclude_none=True) for cfg in self._rtsp_camera_configs]
+
+        with open(SERVER_CONFIG_PATH, "w", encoding="utf-8") as f:
+            yaml.safe_dump(config, f, allow_unicode=True, sort_keys=False)
+        self._save_rtsp_camera_configs_to_kv()
+
+    async def add_rtsp_camera(self, request: RtspCameraCreateRequest) -> RtspCameraInfo:
+        """Add a third-party RTSP camera at runtime and persist to config."""
+        config = request.to_config()
+        if any(cfg.did == config.did for cfg in self._rtsp_camera_configs):
+            raise ValueError(f"RTSP camera already exists: {config.did}")
+
+        self._rtsp_camera_configs.append(config)
+        self._persist_rtsp_camera_configs()
+        await self._refresh_rtsp_cameras()
+        return self._rtsp_camera_info_dict.get(config.did) or config.to_rtsp_camera_info()
+
+    async def update_rtsp_camera(self, did: str, request: RtspCameraCreateRequest) -> RtspCameraInfo:
+        """Update a third-party RTSP camera configuration and visible runtime metadata."""
+        index = next((i for i, cfg in enumerate(self._rtsp_camera_configs) if cfg.did == did), None)
+        if index is None:
+            raise ValueError(f"RTSP camera not found: {did}")
+
+        current_config = self._rtsp_camera_configs[index]
+        updated_config = request.to_config(did_override=did)
+        if not str(request.rtsp_url or "").strip():
+            updated_config.rtsp_url = current_config.rtsp_url
+        self._rtsp_camera_configs[index] = updated_config
+        self._persist_rtsp_camera_configs()
+
+        current_info = self._rtsp_camera_info_dict.get(did)
+        updated_info = updated_config.to_rtsp_camera_info()
+        if current_info:
+            updated_info = current_info.model_copy(update={
+                "name": updated_info.name,
+                "rtsp_url": updated_info.rtsp_url,
+                "codec": updated_info.codec,
+                "enable_audio": updated_info.enable_audio,
+                "use_tcp": updated_info.use_tcp,
+                "home_name": updated_info.home_name,
+                "room_name": updated_info.room_name,
+                "vendor": updated_info.vendor,
+                "model": updated_info.model,
+                "icon": updated_info.icon,
+            })
+            manager = self._camera_img_managers.get(did)
+            if isinstance(manager, RtspCameraVisionHandler):
+                await manager.update_camera_info(updated_info)
+        self._rtsp_camera_info_dict[did] = updated_info
+        return updated_info
+
+    async def delete_rtsp_camera(self, did: str) -> bool:
+        """Delete a third-party RTSP camera from Miloco surfaces and persist config."""
+        original_len = len(self._rtsp_camera_configs)
+        self._rtsp_camera_configs = [cfg for cfg in self._rtsp_camera_configs if cfg.did != did]
+        if len(self._rtsp_camera_configs) == original_len:
+            return False
+
+        self._rtsp_camera_info_dict.pop(did, None)
+        self._camera_img_managers.pop(did, None)
+        if self._rtsp_camera_client and hasattr(self._rtsp_camera_client, "_camera_map"):
+            self._rtsp_camera_client._camera_map.pop(did, None)  # pylint: disable=protected-access
+
+        self._persist_rtsp_camera_configs()
+        return True
 
     @property
     def miot_client(self) -> MIoTClient:
@@ -352,7 +491,12 @@ class MiotProxy:
     async def get_devices(self) -> dict[str, MIoTDeviceInfo]:
         if not self._device_info_dict:
             await self.refresh_devices()
-        return self._device_info_dict
+        hidden = self._get_hidden_device_ids()
+        return {
+            did: device
+            for did, device in self._device_info_dict.items()
+            if did not in hidden
+        }
 
 
     async def refresh_cameras(self) -> dict[str, MIoTCameraInfo | RtspCameraInfo] | None:
@@ -446,6 +590,9 @@ class MiotProxy:
     async def _cleanup_removed_cameras(self, expected_dids: set[str]) -> None:
         for camera_did, manager in list(self._camera_img_managers.items()):
             if camera_did in expected_dids:
+                continue
+            if isinstance(manager, RtspCameraVisionHandler):
+                logger.info("Skip eager destroy for removed RTSP camera %s to avoid native teardown instability", camera_did)
                 continue
             await manager.destroy()
             del self._camera_img_managers[camera_did]

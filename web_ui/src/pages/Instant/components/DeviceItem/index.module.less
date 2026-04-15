@@ -37,6 +37,19 @@
   transition: opacity 0.3s ease, transform 0.3s ease;
   position: relative;
   z-index: 999;
+  .actionGroup {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: flex;
+    gap: 4px;
+    z-index: 1001;
+  }
+  .actionButton {
+    color: #fff;
+    background: rgba(0, 0, 0, 0.35);
+    border-radius: 999px;
+  }
   .itemContentWrap{
     display: flex;
     flex-direction: column;

@@ -13,7 +13,8 @@ from miot.rtsp_camera import RtspCameraInfo
 
 from miloco_server.proxy.miot_proxy import MiotProxy
 from miloco_server.schema.trigger_schema import Action
-from miloco_server.schema.miot_schema import CameraChannel, CameraImgSeq, CameraInfo, DeviceInfo, SceneInfo
+from miloco_server.schema.miot_schema import CameraChannel, CameraImgSeq, CameraInfo, DeviceIdsRequest, DeviceInfo, SceneInfo
+from miloco_server.schema.rtsp_camera_schema import RtspCameraCreateRequest, RtspCameraConfig
 from miloco_server.middleware.exceptions import (
     MiotOAuthException,
     MiotServiceException,
@@ -117,7 +118,7 @@ class MiotService:
         """
         try:
             result = await self._miot_proxy.refresh_devices()
-            if not result:
+            if result is None:
                 raise MiotServiceException("Failed to refresh MiOT devices")
             return True
         except Exception as e:
@@ -196,11 +197,50 @@ class MiotService:
             logger.error("Failed to get MiOT camera list: %s", e)
             raise MiotServiceException(f"Failed to get MiOT camera list: {str(e)}") from e
 
+    async def get_rtsp_camera_list(self) -> List[dict]:
+        """Get configured third-party RTSP camera list."""
+        try:
+            return self._miot_proxy.list_rtsp_camera_configs()
+        except Exception as e:
+            logger.error("Failed to get RTSP camera list: %s", e)
+            raise MiotServiceException(f"Failed to get RTSP camera list: {str(e)}") from e
+
+    async def add_rtsp_camera(self, request: RtspCameraCreateRequest) -> dict:
+        """Add a third-party RTSP camera and refresh runtime camera list."""
+        try:
+            camera_info = await self._miot_proxy.add_rtsp_camera(request)
+            return camera_info.model_dump()
+        except Exception as e:
+            logger.error("Failed to add RTSP camera: %s", e)
+            raise MiotServiceException(f"Failed to add RTSP camera: {str(e)}") from e
+
+    async def update_rtsp_camera(self, did: str, request: RtspCameraCreateRequest) -> dict:
+        """Update a third-party RTSP camera."""
+        try:
+            camera_info = await self._miot_proxy.update_rtsp_camera(did, request)
+            return camera_info.model_dump()
+        except Exception as e:
+            logger.error("Failed to update RTSP camera: %s", e)
+            raise MiotServiceException(f"Failed to update RTSP camera: {str(e)}") from e
+
+    async def delete_rtsp_camera(self, did: str) -> bool:
+        """Delete a third-party RTSP camera."""
+        try:
+            success = await self._miot_proxy.delete_rtsp_camera(did)
+            if not success:
+                raise ResourceNotFoundException(f"RTSP camera not found: {did}")
+            return True
+        except ResourceNotFoundException:
+            raise
+        except Exception as e:
+            logger.error("Failed to delete RTSP camera: %s", e)
+            raise MiotServiceException(f"Failed to delete RTSP camera: {str(e)}") from e
+
     async def get_miot_device_list(self) -> List[DeviceInfo]:
         try:
             device_dict: dict[
                 str, MIoTDeviceInfo] = await self._miot_proxy.get_devices()
-            if not device_dict:
+            if device_dict is None:
                 raise MiotServiceException("Failed to get MiOT device list")
             device_list = [
                 DeviceInfo.model_validate(device_info.model_dump())
@@ -212,6 +252,34 @@ class MiotService:
         except Exception as e:
             logger.error("Failed to get MiOT device list: %s", e)
             raise MiotServiceException(f"Failed to get MiOT device list: {str(e)}") from e
+
+    async def hide_miot_devices(self, request: DeviceIdsRequest) -> int:
+        """Hide MiOT devices inside Miloco only."""
+        try:
+            return self._miot_proxy.hide_devices(request.device_ids)
+        except Exception as e:
+            logger.error("Failed to hide MiOT devices: %s", e)
+            raise MiotServiceException(f"Failed to hide MiOT devices: {str(e)}") from e
+
+    async def get_hidden_miot_device_list(self) -> List[DeviceInfo]:
+        """Get MiOT devices hidden inside Miloco."""
+        try:
+            device_dict = self._miot_proxy.list_hidden_devices()
+            return [
+                DeviceInfo.model_validate(device_info.model_dump())
+                for device_info in device_dict.values()
+            ]
+        except Exception as e:
+            logger.error("Failed to get hidden MiOT device list: %s", e)
+            raise MiotServiceException(f"Failed to get hidden MiOT device list: {str(e)}") from e
+
+    async def restore_miot_devices(self, request: DeviceIdsRequest) -> int:
+        """Restore hidden MiOT devices inside Miloco."""
+        try:
+            return self._miot_proxy.restore_devices(request.device_ids)
+        except Exception as e:
+            logger.error("Failed to restore MiOT devices: %s", e)
+            raise MiotServiceException(f"Failed to restore MiOT devices: {str(e)}") from e
 
     async def get_miot_cameras_img(
             self, camera_dids: list[str], vision_use_img_count: int) -> list[CameraImgSeq]:

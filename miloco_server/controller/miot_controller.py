@@ -20,6 +20,8 @@ from miloco_server.middleware import (
 )
 from miloco_server.middleware import MiotServiceException, ResourceNotFoundException
 from miloco_server.schema.common_schema import NormalResponse
+from miloco_server.schema.miot_schema import DeviceIdsRequest
+from miloco_server.schema.rtsp_camera_schema import RtspCameraCreateRequest
 from miloco_server.service.manager import get_manager
 
 logger = logging.getLogger(name=__name__)
@@ -130,6 +132,91 @@ async def get_miot_camera_list(current_user: str = Depends(verify_token)):
         message="MiOT camera list retrieved successfully",
         data=camera_list
     )
+
+
+@router.get(path="/rtsp_cameras", summary="Get configured RTSP camera list", response_model=NormalResponse)
+async def get_rtsp_camera_list(current_user: str = Depends(verify_token)):
+    """Get configured third-party RTSP camera list."""
+    logger.info("Get RTSP camera list API called, user: %s", current_user)
+    camera_list = await manager.miot_service.get_rtsp_camera_list()
+    return NormalResponse(
+        code=0,
+        message="RTSP camera list retrieved successfully",
+        data=camera_list,
+    )
+
+
+@router.post(path="/rtsp_cameras", summary="Add RTSP camera", response_model=NormalResponse)
+async def add_rtsp_camera(request: RtspCameraCreateRequest, current_user: str = Depends(verify_token)):
+    """Add a third-party RTSP camera."""
+    logger.info("Add RTSP camera API called, user: %s, name: %s", current_user, request.name)
+    camera_info = await manager.miot_service.add_rtsp_camera(request)
+    return NormalResponse(
+        code=0,
+        message="RTSP camera added successfully",
+        data=camera_info,
+    )
+
+
+@router.put(path="/rtsp_cameras/{did}", summary="Update RTSP camera", response_model=NormalResponse)
+async def update_rtsp_camera(did: str, request: RtspCameraCreateRequest, current_user: str = Depends(verify_token)):
+    """Update a third-party RTSP camera."""
+    logger.info("Update RTSP camera API called, user: %s, did: %s", current_user, did)
+    camera_info = await manager.miot_service.update_rtsp_camera(did, request)
+    return NormalResponse(
+        code=0,
+        message="RTSP camera updated successfully",
+        data=camera_info,
+    )
+
+
+@router.delete(path="/rtsp_cameras/{did}", summary="Delete RTSP camera", response_model=NormalResponse)
+async def delete_rtsp_camera(did: str, current_user: str = Depends(verify_token)):
+    """Delete a third-party RTSP camera."""
+    logger.info("Delete RTSP camera API called, user: %s, did: %s", current_user, did)
+    await manager.miot_service.delete_rtsp_camera(did)
+    return NormalResponse(
+        code=0,
+        message="RTSP camera deleted successfully",
+        data=None,
+    )
+
+
+@router.post(path="/devices/hide", summary="Hide MiOT devices", response_model=NormalResponse)
+async def hide_miot_devices(request: DeviceIdsRequest, current_user: str = Depends(verify_token)):
+    """Hide MiOT devices inside Miloco."""
+    logger.info("Hide MiOT devices API called, user: %s, count: %s", current_user, len(request.device_ids))
+    total_hidden = await manager.miot_service.hide_miot_devices(request)
+    return NormalResponse(
+        code=0,
+        message="MiOT devices hidden successfully",
+        data={"hidden_count": total_hidden},
+    )
+
+
+@router.get(path="/devices/hidden", summary="Get hidden MiOT devices", response_model=NormalResponse)
+async def get_hidden_miot_devices(current_user: str = Depends(verify_token)):
+    """Get MiOT devices hidden inside Miloco."""
+    logger.info("Get hidden MiOT devices API called, user: %s", current_user)
+    device_list = await manager.miot_service.get_hidden_miot_device_list()
+    return NormalResponse(
+        code=0,
+        message="Hidden MiOT devices retrieved successfully",
+        data=device_list,
+    )
+
+
+@router.post(path="/devices/restore", summary="Restore MiOT devices", response_model=NormalResponse)
+async def restore_miot_devices(request: DeviceIdsRequest, current_user: str = Depends(verify_token)):
+    """Restore hidden MiOT devices inside Miloco."""
+    logger.info("Restore MiOT devices API called, user: %s, count: %s", current_user, len(request.device_ids))
+    total_hidden = await manager.miot_service.restore_miot_devices(request)
+    return NormalResponse(
+        code=0,
+        message="MiOT devices restored successfully",
+        data={"hidden_count": total_hidden},
+    )
+
 
 @router.get(path="/device_list", summary="Get MiOT device list", response_model=NormalResponse)
 async def get_miot_device_list(current_user: str = Depends(verify_token)):
