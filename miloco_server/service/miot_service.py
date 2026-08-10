@@ -41,18 +41,12 @@ class MiotService:
         """Get the MIoTClient instance."""
         return self._miot_proxy.miot_client
 
-    async def process_xiaomi_home_callback(self, code: str, state: str):
-        """
-        Process Xiaomi MiOT authorization code
-        """
+    async def authorize_with_code(self, code: str, state: str):
+        """Process Xiaomi MiOT authorization code submitted from the redirect page."""
         try:
-            logger.info(
-                "process_xiaomi_home_callback code: %s, status: %s", code, state)
-
-            await self._miot_proxy.get_miot_auth_info(code=code,
-                                                              state=state)
+            logger.info("authorize_with_code state=%s code=%s…", state, code[:8])
+            await self._miot_proxy.get_miot_auth_info(code=code, state=state)
             await self._mcp_client_manager.init_miot_mcp_clients()
-
         except Exception as e:
             logger.error("Failed to process Xiaomi MiOT authorization code: %s", e)
             raise MiotServiceException(f"Failed to process Xiaomi MiOT authorization code: {str(e)}") from e

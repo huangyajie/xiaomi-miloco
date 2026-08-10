@@ -167,6 +167,16 @@ export default {
     exit: 'Exit',
     agree: 'Agree',
   },
+  authCode: {
+    title: 'Paste Authorization Code',
+    desc: 'After completing Xiaomi login in the new tab, copy the authorization code from the redirect page and paste it here.',
+    placeholder: 'Paste the authorization code here…',
+    submit: 'Authorize',
+    cancel: 'Cancel',
+    errorEmpty: 'Authorization code cannot be empty.',
+    errorFormat: 'Invalid authorization code format. Please copy it directly from the redirect page.',
+    errorSubmit: 'Authorization failed. Please try again.',
+  },
   smartCenter: {
     pleaseSelectAction: 'Please select execution scene',
     aiRecommendedAction: 'AI Recommended Action',

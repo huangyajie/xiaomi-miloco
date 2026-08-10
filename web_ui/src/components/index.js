@@ -9,6 +9,7 @@
  */
 
 export { default as Card } from './Card';
+export { default as AuthCodeModal } from './AuthCodeModal';
 export { default as ConsentModal } from './ConsentModal';
 export { default as ContentModal } from './ContentModal';
 export { default as Header } from './Header';

@@ -162,12 +162,22 @@ export default {
   },
   consent: {
     title: 'Xiaomi Miloco',
-    welcomeMessage: '欢迎您使用“Xiaomi Miloco”，您可以通过本产品基于自然语言处理、深度学习等技术进行信息识别和推理，并通过联动“米家”云端的能力，以创建或执行特定的设备操作指令。在您使用本产品的过程中，我们将联网为您提供服务。',
+    welcomeMessage: '欢迎您使用”Xiaomi Miloco”，您可以通过本产品基于自然语言处理、深度学习等技术进行信息识别和推理，并通过联动”米家”云端的能力，以创建或执行特定的设备操作指令。在您使用本产品的过程中，我们将联网为您提供服务。',
     consentText: '请您阅读并同意',
     userAgreement: '《Xiaomi Miloco用户协议》',
     privacyPolicy: '《Xiaomi Miloco隐私政策》',
     exit: '退出',
     agree: '同意',
+  },
+  authCode: {
+    title: '粘贴授权码',
+    desc: '在新标签页完成小米账号授权后，将回调页面的授权码复制并粘贴到此处。',
+    placeholder: '在此粘贴授权码…',
+    submit: '确认授权',
+    cancel: '取消',
+    errorEmpty: '授权码不能为空。',
+    errorFormat: '授权码格式错误，请从回调页面直接复制。',
+    errorSubmit: '授权失败，请重试。',
   },
   smartCenter: {
     pleaseSelectAction: '请选择执行场景',

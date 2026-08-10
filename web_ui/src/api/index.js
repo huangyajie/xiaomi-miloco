@@ -15,6 +15,7 @@ export const getLanguage = () => getApi('/api/auth/language');
 
 // miot API
 export const getUserLoginStatus = () => getApi('/api/miot/login_status');
+export const authorizeMiot = (data) => postApi('/api/miot/authorize', data);
 export const getUserInfo = () => getApi('/api/miot/user_info');
 export const getCameraList = () => getApi('/api/miot/camera_list');
 export const getDeviceList = () => getApi('/api/miot/device_list');

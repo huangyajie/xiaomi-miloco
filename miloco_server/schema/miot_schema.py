@@ -129,3 +129,9 @@ class HAConfig(BaseModel):
     """Home Assistant configuration request"""
     base_url: str = Field(..., description="Home Assistant base URL", min_length=1)
     token: str = Field(..., description="Home Assistant access token", min_length=1)
+
+
+class AuthorizeRequest(BaseModel):
+    """OAuth result submitted from the Xiaomi redirect page via the web UI."""
+    code: str = Field(..., description="OAuth authorization code", min_length=1)
+    state: str = Field(..., description="OAuth state token", min_length=1)

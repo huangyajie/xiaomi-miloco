@@ -6,20 +6,19 @@ Xiaomi IoT controller
 Handles Xiaomi IoT device login, authorization, and device management
 """
 import logging
-import os
 from collections import OrderedDict
 from datetime import datetime
 from typing import Dict, Optional
 from fastapi import APIRouter, Depends, WebSocket
-from fastapi.responses import HTMLResponse
 from fastapi.websockets import WebSocketDisconnect, WebSocketState
 
 from miloco_server.middleware import (
     verify_token,
     verify_websocket_token
 )
-from miloco_server.middleware import MiotServiceException, ResourceNotFoundException
+from miloco_server.middleware import MiotServiceException
 from miloco_server.schema.common_schema import NormalResponse
+from miloco_server.schema.miot_schema import AuthorizeRequest
 from miloco_server.service.manager import get_manager
 
 logger = logging.getLogger(name=__name__)
@@ -29,61 +28,12 @@ router = APIRouter(prefix="/miot", tags=["Xiaomi IoT"])
 manager = get_manager()
 
 
-@router.get("/xiaomi_home_callback", summary="Xiaomi Home authorization callback", response_class=HTMLResponse)
-async def xiaomi_home_callback(code: str, state: str):
-    """Xiaomi Home authorization callback handler"""
-    logger.info(
-        "Xiaomi Home authorization callback: code=%s, state=%s", code, state)
-
-    # Read HTML template file
-    template_path = os.path.join(os.path.dirname(
-        __file__), "..", "templates", "miot_login_callback.html")
-    try:
-        with open(template_path, "r", encoding="utf-8") as f:
-            template_content = f.read()
-    except FileNotFoundError as exc:
-        logger.error("HTML template file not found: %s", template_path)
-        raise ResourceNotFoundException("HTML template file not found") from exc
-
-    try:
-        await manager.miot_service.process_xiaomi_home_callback(code, state)
-
-        logger.info("Xiaomi Home authorization callback processed successfully")
-
-        # Authorization successful
-        title = "Authorization Successful"
-        content = "Xiaomi Home authorization successful, you can close this page"
-        button = "Close"
-        success = True
-
-    except MiotServiceException as e:
-        logger.error(
-            "Xiaomi Home authorization callback processing failed - MiOT service error: %s", e.message)
-
-        # Authorization failed
-        title = "Authorization Failed"
-        content = f"Xiaomi Home authorization failed: {e.message}"
-        button = "Close"
-        success = False
-
-    except Exception as e:  # pylint: disable=broad-exception-caught
-        logger.error(
-            "Unknown error occurred during Xiaomi Home authorization callback processing: %s", str(e))
-
-        # Unknown error
-        title = "Authorization Failed"
-        content = f"Unknown error occurred during Xiaomi Home authorization: {str(e)}"
-        button = "Close"
-        success = False
-
-    # Fill HTML template
-    web_page = template_content.replace("TITLE_PLACEHOLDER", title)
-    web_page = web_page.replace("CONTENT_PLACEHOLDER", content)
-    web_page = web_page.replace("BUTTON_PLACEHOLDER", button)
-    web_page = web_page.replace(
-        "STATUS_PLACEHOLDER", "true" if success else "false")
-
-    return HTMLResponse(content=web_page)
+@router.post("/authorize", summary="Submit Xiaomi authorization code from redirect page", response_model=NormalResponse)
+async def authorize_miot(request: AuthorizeRequest, current_user: str = Depends(verify_token)):
+    """Accept OAuth code+state submitted by the web UI after the user completes Xiaomi login."""
+    logger.info("MiOT authorize API called, user: %s", current_user)
+    await manager.miot_service.authorize_with_code(request.code, request.state)
+    return NormalResponse(code=0, message="MiOT authorized successfully", data=None)
 
 
 @router.get("/login_status", summary="Check MiOT login status", response_model=NormalResponse)
