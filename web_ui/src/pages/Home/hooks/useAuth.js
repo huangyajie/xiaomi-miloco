@@ -6,7 +6,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { message } from 'antd';
-import { getUserInfo, getUserLoginStatus, getUserLoginOut, setLanguage, getRefreshMiotAllInfo, refreshMiotCamera, refreshMiotScenes, refreshHaAutomation } from '@/api';
+import { getUserInfo, getUserLoginStatus, getUserLoginOut, setLanguage, getRefreshMiotAllInfo, refreshMiotCamera, refreshMiotScenes, refreshHaAutomation, authorizeMiot } from '@/api';
 import { useSettingStore } from '@/stores/settingStore';
 import { AUTH_CONFIG } from '@/constants/homeConfigTypes';
 
@@ -23,6 +23,7 @@ export const useAuth = (t) => {
   const [loading, setLoading] = useState(true);
   const [needRetryAuth, setNeedRetryAuth] = useState(false);
   const [showConsentModal, setShowConsentModal] = useState(false);
+  const [showAuthCodeModal, setShowAuthCodeModal] = useState(false);
 
   const timeRef = useRef(null);
   const reqNumRef = useRef(0);
@@ -128,17 +129,14 @@ export const useAuth = (t) => {
   };
 
   /**
-   * Handle consent modal agree
+   * Handle consent modal agree — open login URL then show the auth-code input modal
    */
   const handleConsentAgree = () => {
     setShowConsentModal(false);
     if (loginUrlRef.current) {
       window.open(loginUrlRef.current, '_blank');
     }
-    timeRef.current = setTimeout(() => {
-      initFetch();
-      reqNumRef.current++;
-    }, RETRY_INTERVAL);
+    setShowAuthCodeModal(true);
   };
 
   /**
@@ -146,6 +144,29 @@ export const useAuth = (t) => {
    */
   const handleConsentExit = () => {
     setShowConsentModal(false);
+    setNeedRetryAuth(true);
+    setLoading(false);
+    goToOhCodeRef.current = false;
+  };
+
+  /**
+   * Handle auth code submission — POST to /api/miot/authorize then load user info
+   */
+  const handleAuthCodeSubmit = async ({ code, state }) => {
+    const res = await authorizeMiot({ code, state });
+    if (!res || res.code !== 0) {
+      throw new Error(res?.message || t('authCode.errorSubmit'));
+    }
+    setShowAuthCodeModal(false);
+    await fetchUserInfo();
+    setLoading(false);
+  };
+
+  /**
+   * Handle auth code modal cancel
+   */
+  const handleAuthCodeCancel = () => {
+    setShowAuthCodeModal(false);
     setNeedRetryAuth(true);
     setLoading(false);
     goToOhCodeRef.current = false;
@@ -187,10 +208,13 @@ export const useAuth = (t) => {
     loading,
     needRetryAuth,
     showConsentModal,
+    showAuthCodeModal,
     retryAuth,
     logout,
     handleConsentAgree,
     handleConsentExit,
+    handleAuthCodeSubmit,
+    handleAuthCodeCancel,
     loginUrl: loginUrlRef?.current,
   };
 };

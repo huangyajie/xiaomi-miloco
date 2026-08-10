@@ -150,6 +150,8 @@ class MIoTOAuth2Client:
             or res_obj.get("code", None) != 0
             or "result" not in res_obj
             or not all(key in res_obj["result"] for key in ["access_token", "refresh_token", "expires_in"])
+            or not res_obj["result"]["access_token"]
+            or not res_obj["result"]["refresh_token"]
         ):
             raise MIoTOAuth2Error(f"invalid http response, {res_str}, {json.dumps(data)}")
 
@@ -341,6 +343,9 @@ class MIoTHttpClient:
         timeout: int = MIHOME_HTTP_API_TIMEOUT
     ) -> Dict:
         """Get data from mihome api with http post."""
+        if not self._access_token:
+            raise MIoTHttpError(
+                "access token is empty", MIoTErrorCode.CODE_HTTP_INVALID_ACCESS_TOKEN)
         http_res = await self._session.post(
             url=f"{self._base_url}{url_path}",
             data=self.aes_encrypt_with_b64(data),

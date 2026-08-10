@@ -4,7 +4,7 @@
  */
 
 import { useTranslation } from 'react-i18next';
-import { LoadingScreen, ErrorRetry, ConsentModal } from '@/components';
+import { LoadingScreen, ErrorRetry, ConsentModal, AuthCodeModal } from '@/components';
 import { useAuth, useLayout } from './hooks/index';
 import { Layout } from './components';
 
@@ -21,10 +21,13 @@ const Home = () => {
     loading,
     needRetryAuth,
     showConsentModal,
+    showAuthCodeModal,
     retryAuth,
     logout,
     handleConsentAgree,
     handleConsentExit,
+    handleAuthCodeSubmit,
+    handleAuthCodeCancel,
     loginUrl,
   } = useAuth(t)
 
@@ -32,7 +35,7 @@ const Home = () => {
     selectedMenuKey,
   } = useLayout()
 
-  if (loading && !showConsentModal) {
+  if (loading && !showConsentModal && !showAuthCodeModal) {
     return (
       <LoadingScreen
         title="common.loading"
@@ -59,6 +62,17 @@ const Home = () => {
         visible={showConsentModal}
         onAgree={handleConsentAgree}
         onExit={handleConsentExit}
+        t={t}
+      />
+    )
+  }
+
+  if (showAuthCodeModal) {
+    return (
+      <AuthCodeModal
+        visible={showAuthCodeModal}
+        onSubmit={handleAuthCodeSubmit}
+        onCancel={handleAuthCodeCancel}
         t={t}
       />
     )

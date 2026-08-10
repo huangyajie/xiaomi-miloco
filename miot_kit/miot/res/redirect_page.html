@@ -153,36 +153,24 @@
             margin-top: 20px;
         }
 
-        .address-display-container {
-            position: relative;
+        #closeButton {
             width: 100%;
-        }
-
-        .address-display {
-            width: 100%;
-            height: 46px;
-            border: 1px solid rgba(0, 0, 0, 0.2);
+            background-color: #bbb;
+            color: #fff;
+            border: none;
             border-radius: 4px;
-            padding: 0 15px;
             font-size: 16px;
-            font-family: inherit;
-            background: rgba(255, 255, 255, 0.8);
-            color: #666666;
-            outline: none;
-            transition: all 0.3s ease;
-            box-sizing: border-box;
-            cursor: text;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
+            cursor: pointer;
+            transition: background 0.3s;
         }
 
-        .button-container #buttonArea {
-            margin-top: 20px;
-            width: 100%;
+        #closeButton:hover {
+            background-color: #999;
         }
 
-
+        #closeHint {
+            color: rgba(0, 0, 0, 0.5);
+        }
 
         /* 深色模式样式 */
         @media (prefers-color-scheme: dark) {
@@ -218,70 +206,15 @@
                 fill: #ffffff !important;
             }
 
-            .copy-text {
-                color: #ffffff !important;
-            }
-
             button:hover {
                 background-color: #e55500 !important;
                 transform: translateY(-1px) !important;
                 box-shadow: 0 4px 12px rgba(255, 92, 0, 0.4) !important;
             }
 
-
-            .address-display {
-                border-color: rgba(255, 255, 255, 0.3) !important;
-                background: rgba(255, 255, 255, 0.08) !important;
-                color: #ffffff !important;
+            #closeHint {
+                color: rgba(255, 255, 255, 0.4) !important;
             }
-
-            .address-display::placeholder {
-                color: rgba(255, 255, 255, 0.5) !important;
-            }
-        }
-
-        .button-row {
-            display: flex;
-            gap: 10px;
-            width: 100%;
-            margin-top: 20px;
-        }
-
-        #buttonArea {
-            flex: 1;
-            display: inline-block;
-            text-align: center;
-            background-color: #ff5c00;
-            color: #fff;
-            border: none;
-            border-radius: 4px;
-            font-size: 16px;
-            font-weight: 400;
-            height: 46px;
-            line-height: 46px;
-            text-decoration: none;
-            cursor: pointer;
-            transition: all .3s cubic-bezier(.645, .045, .355, 1);
-            white-space: nowrap;
-        }
-
-        #buttonArea:hover {
-            background-color: #e55500;
-        }
-
-        #closeButton {
-            width: 120px;
-            background-color: #bbb;
-            color: #fff;
-            border: none;
-            border-radius: 4px;
-            font-size: 16px;
-            cursor: pointer;
-            transition: background 0.3s;
-        }
-
-        #closeButton:hover {
-            background-color: #999;
         }
     </style>
 </head>
@@ -299,8 +232,8 @@
                         points="1.78097075e-14 0.000125324675 192.540685 0.000125324675 192.540685 192.540058 1.78097075e-14 192.540058">
                     </polygon>
                 </defs>
-                <g id="\u9875\u9762-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
-                    <g id="\u7F16\u7EC4">
+                <g id="页面-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+                    <g id="编组">
                         <mask id="mask-2" fill="white">
                             <use xlink:href="#path-1"></use>
                         </mask>
@@ -326,332 +259,162 @@
             <a id="titleArea">授权成功</a>
         </div>
         <!-- AUTH INFO -->
-        <div class="text-input-container">
+        <div class="text-input-container" id="authInfoContainer">
             <input type="text" class="text-input" id="textInput" placeholder="等待参数处理..." readonly
                 onclick="selectAllText()">
-
             <button class="copy-button" onclick="copyText()" title="复制">
                 <svg class="copy-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path
                         d="M16 1H4C2.9 1 2 1.9 2 3V17H4V3H16V1ZM19 5H8C6.9 5 6 5.9 6 7V21C6 22.1 6.9 23 8 23H19C20.1 23 21 22.1 21 21V7C21 5.9 20.1 5 19 5ZM19 21H8V7H19V21Z" />
                 </svg>
-                <span class="copy-text" style="display: none;">复制</span>
             </button>
         </div>
+        <!-- TIP -->
+        <div class="content-frame" id="contentArea"></div>
         <!-- BUTTON -->
         <div class="button-container">
-            <div class="address-display-container">
-                <input type="text" class="address-display" id="addressDisplay"
-                    placeholder="请输入xiaomi miloco网页地址，例如: https://192.168.31.100:8000">
-            </div>
-        </div>
-        <!-- TIP -->
-        <div class="content-frame" id="contentArea">
-            <ol>
-                <li>如果设置了跳转链接，可以直接"点击跳转"进行授权；如果没有设置，可以直接在输入框中输入跳转地址，该跳转地址存储在浏览器Cookie中。</li>
-                <li>也可以点击复制图标，复制授权信息，然后回到应用页面输入授权信息，继续操作。</li>
-            </ol>
-        </div>
-        <div class="button-row">
             <button id="closeButton" onClick="closePage()">关闭页面</button>
-            <a id="buttonArea" href="#" onclick="handleJump(); return false;">点击跳转</a>
+            <div id="closeHint" style="display:none;margin-top:10px;font-size:13px;color:rgba(0,0,0,.5);text-align:center;"></div>
         </div>
     </div>
 
     <script>
-        // 多语言配置
-        const translations = {
+        var translations = {
             'zh-CN': {
                 title: '授权成功',
-                content: `<ol>
-    <li>如果设置了跳转链接，可以直接"点击跳转"进行授权；如果没有设置，可以直接在输入框中输入跳转地址，该跳转地址存储在浏览器Cookie中。</li>
-    <li>也可以点击复制图标，复制授权信息，然后回到应用页面输入授权信息，继续操作。</li>
-    </ol>`,
+                content: '点击复制图标，复制授权信息，然后回到应用页面输入授权信息，继续操作。',
                 placeholder: '等待参数处理...',
-                copyButton: '复制',
                 copySuccess: '已复制',
-                buttonPlaceholder: '点击跳转',
-                noParamsTitle: '无参数传入',
-                noParamsContent: '页面将自动关闭',
                 copyFailed: '复制失败，请手动复制',
                 encodingFailed: '参数处理失败',
-                settingsTitle: '设置IP地址',
-                addressPlaceholder: '请输入xiaomi miloco网页地址，例如: https://192.168.31.100:8000',
-                settingsSaved: '设置已保存',
-                settingsCancel: '取消',
-                settingsSave: '保存',
-                settingsRequired: '请先设置IP地址',
-                settingsInvalidIP: '请输入完整地址（如：https://192.168.31.100:8000）',
-                noParamsToSend: '没有参数可发送',
-                requestFailed: '请求失败',
+                noParamsTitle: '无参数传入',
+                noParamsContent: '未收到有效的授权参数，请重新发起授权。',
+                noParamsPlaceholder: '无参数传入',
                 closeHintTitle: '请手动关闭页面',
                 closeHintContent: '由于浏览器安全限制，请手动关闭此页面',
-                updateSuccessTitle: '地址更新成功',
-                updateSuccessContent: '地址更新成功，当前跳转地址为：\r\n',
-                updateErrorTitle: '地址无效',
-                noParamsCopyTitle: '无参数可复制',
-                noParamsJumpTitle: '无参数可跳转',
-                noParamsPlaceholder: '无参数传入'
+                errorTitle: '授权失败',
+                errorContent: '小米账号授权未完成，请重新发起授权。',
+                oauthErrors: {
+                    'access_denied': '用户拒绝了授权请求',
+                    'invalid_request': '授权请求参数无效',
+                    'unauthorized_client': '应用未被允许发起此授权请求',
+                    'unsupported_response_type': '不支持的授权类型',
+                    'invalid_scope': '请求的权限范围无效',
+                    'server_error': '小米服务器内部错误',
+                    'temporarily_unavailable': '小米服务暂时不可用'
+                }
             },
             'zh-TW': {
                 title: '授權成功',
-                content: `<ol>
-    <li>如果已設置跳轉連結，可直接點擊「點擊跳轉」進行授權；如未設置，可直接在輸入框中輸入跳轉地址，該地址將存儲於瀏覽器Cookie中。</li>
-    <li>也可點擊複製圖示，複製授權資訊，然後回到應用頁面輸入授權資訊繼續操作。</li>
-    </ol>`,
+                content: '點擊複製圖示，複製授權資訊，然後回到應用頁面輸入授權資訊，繼續操作。',
                 placeholder: '等待參數處理...',
-                copyButton: '複製',
                 copySuccess: '已複製',
-                buttonPlaceholder: '點擊跳轉',
-                noParamsTitle: '無參數傳入',
-                noParamsContent: '頁面將自動關閉',
                 copyFailed: '複製失敗，請手動複製',
                 encodingFailed: '參數處理失敗',
-                settingsTitle: '設置IP地址',
-                addressPlaceholder: '請輸入xiaomi miloco網頁地址，例如: https://192.168.31.100:8000',
-                settingsSaved: '設置已保存',
-                settingsCancel: '取消',
-                settingsSave: '保存',
-                settingsRequired: '請先設置IP地址',
-                settingsInvalidIP: '請輸入完整地址（如：https://192.168.31.100:8000）',
-                noParamsToSend: '沒有參數可發送',
-                requestFailed: '請求失敗',
+                noParamsTitle: '無參數傳入',
+                noParamsContent: '未收到有效的授權參數，請重新發起授權。',
+                noParamsPlaceholder: '無參數傳入',
                 closeHintTitle: '請手動關閉頁面',
                 closeHintContent: '由於瀏覽器安全限制，請手動關閉此頁面',
-                updateSuccessTitle: '地址更新成功',
-                updateSuccessContent: '地址更新成功，當前跳轉地址為：\r\n',
-                updateErrorTitle: '地址無效',
-                noParamsCopyTitle: '無參數可複製',
-                noParamsJumpTitle: '無參數可跳轉',
-                noParamsPlaceholder: '無參數傳入'
+                errorTitle: '授權失敗',
+                errorContent: '小米帳號授權未完成，請重新發起授權。',
+                oauthErrors: {
+                    'access_denied': '用戶拒絕了授權請求',
+                    'invalid_request': '授權請求參數無效',
+                    'unauthorized_client': '應用未被允許發起此授權請求',
+                    'unsupported_response_type': '不支援的授權類型',
+                    'invalid_scope': '請求的權限範圍無效',
+                    'server_error': '小米服務器內部錯誤',
+                    'temporarily_unavailable': '小米服務暫時不可用'
+                }
             },
             'en': {
                 title: 'Authorization Successful',
-                content: `<ol>
-    <li>If a redirect link is set, you can directly click "Click to Jump" to authorize. If not set, you can directly enter the redirect address in the input box, which will be stored in the browser Cookie.</li>
-    <li>You can also click the copy icon to copy the authorization info, then return to the app page, paste the info and continue.</li>
-    </ol>`,
+                content: 'Click the copy icon to copy the authorization code, then return to the app and paste it to continue.',
                 placeholder: 'Waiting for parameter processing...',
-                copyButton: 'Copy',
                 copySuccess: 'Copied',
-                buttonPlaceholder: 'Click to Jump',
-                noParamsTitle: 'No Parameters',
-                noParamsContent: 'Page will close automatically',
                 copyFailed: 'Copy failed, please copy manually',
                 encodingFailed: 'Parameter processing failed',
-                settingsTitle: 'Set IP Address',
-                addressPlaceholder: 'Please enter the Xiaomi Miloco webpage address, e.g.: https://192.168.31.100:8000',
-                settingsSaved: 'Settings saved',
-                settingsCancel: 'Cancel',
-                settingsSave: 'Save',
-                settingsRequired: 'Please set IP address first',
-                settingsInvalidIP: 'Please enter a valid IP address, format: https://192.168.31.100:8000',
-                noParamsToSend: 'No parameters to send',
-                requestFailed: 'Request failed',
+                noParamsTitle: 'No Parameters',
+                noParamsContent: 'No valid authorization parameters received. Please initiate authorization again.',
+                noParamsPlaceholder: 'No parameters',
                 closeHintTitle: 'Please close this page manually',
                 closeHintContent: 'Due to browser security restrictions, please close this page manually',
-                updateSuccessTitle: 'Address updated successfully',
-                updateSuccessContent: 'Address updated successfully, current redirect address is:\r\n',
-                updateErrorTitle: 'Invalid address',
-                noParamsCopyTitle: 'No parameters to copy',
-                noParamsJumpTitle: 'No parameters to jump',
-                noParamsPlaceholder: 'No parameters'
+                errorTitle: 'Authorization Failed',
+                errorContent: 'Xiaomi account authorization was not completed. Please initiate authorization again.',
+                oauthErrors: {
+                    'access_denied': 'User denied the authorization request',
+                    'invalid_request': 'Invalid authorization request parameters',
+                    'unauthorized_client': 'The application is not allowed to initiate this authorization request',
+                    'unsupported_response_type': 'Unsupported authorization type',
+                    'invalid_scope': 'Invalid permission scope requested',
+                    'server_error': 'Xiaomi server internal error',
+                    'temporarily_unavailable': 'Xiaomi service temporarily unavailable'
+                }
             },
             'ja': {
                 title: '認証成功',
-                content: `<ol>
-    <li>リダイレクトリンクが設定されている場合は「クリックしてジャンプ」をクリックして認証できます。未設定の場合は入力ボックスに直接リダイレクト先を入力してください（ブラウザのCookieに保存されます）。</li>
-    <li>また、コピーアイコンをクリックして認証情報をコピーし、アプリページに戻って貼り付けて続行することもできます。</li>
-    </ol>`,
+                content: 'コピーアイコンをクリックして認証情報をコピーし、アプリページに戻って貼り付けて続行してください。',
                 placeholder: 'パラメータ処理中...',
-                copyButton: 'コピー',
                 copySuccess: 'コピー済み',
-                buttonPlaceholder: 'クリックしてジャンプ',
-                noParamsTitle: 'パラメータなし',
-                noParamsContent: 'ページは自動的に閉じられます',
                 copyFailed: 'コピーに失敗しました。手動でコピーしてください',
                 encodingFailed: 'パラメータ処理に失敗しました',
-                settingsTitle: 'IPアドレス設定',
-                addressPlaceholder: 'Xiaomi Milocoのウェブページアドレスを入力してください、例: https://192.168.31.100:8000',
-                settingsSaved: '設定が保存されました',
-                settingsCancel: 'キャンセル',
-                settingsSave: '保存',
-                settingsRequired: '先にIPアドレスを設定してください',
-                settingsInvalidIP: '有効なIPアドレスを入力してください、形式: https://192.168.31.100:8000',
-                noParamsToSend: '送信するパラメータがありません',
-                requestFailed: 'リクエストに失敗しました',
+                noParamsTitle: 'パラメータなし',
+                noParamsContent: '有効な認証パラメータが受信されませんでした。再度認証を開始してください。',
+                noParamsPlaceholder: 'パラメータがありません',
                 closeHintTitle: 'ページを手動で閉じてください',
                 closeHintContent: 'ブラウザのセキュリティ制限により、このページを手動で閉じてください',
-                updateSuccessTitle: 'アドレスが更新されました',
-                updateSuccessContent: 'アドレスが更新されました、現在のリダイレクトアドレスは：\r\n',
-                updateErrorTitle: '無効なアドレス',
-                noParamsCopyTitle: 'コピーするパラメータがありません',
-                noParamsJumpTitle: 'ジャンプするパラメータがありません',
-                noParamsPlaceholder: 'パラメータがありません'
+                errorTitle: '認証失敗',
+                errorContent: 'Xiaomiアカウントの認証が完了しませんでした。再度認証を開始してください。',
+                oauthErrors: {
+                    'access_denied': 'ユーザーが認証リクエストを拒否しました',
+                    'invalid_request': '認証リクエストのパラメータが無効です',
+                    'unauthorized_client': 'アプリケーションはこの認証リクエストを開始できません',
+                    'unsupported_response_type': 'サポートされていない認証タイプです',
+                    'invalid_scope': '要求された権限範囲が無効です',
+                    'server_error': 'Xiaomiサーバーの内部エラー',
+                    'temporarily_unavailable': 'Xiaomiサービスは一時的に利用できません'
+                }
             },
             'ko': {
                 title: '인증 성공',
-                content: `<ol>
-    <li>리디렉션 링크가 설정되어 있으면 "클릭하여 이동"을 눌러 인증할 수 있습니다. 설정되어 있지 않으면 입력 상자에 직접 리디렉션 주소를 입력하세요(브라우저 쿠키에 저장됨).</li>
-    <li>또한 복사 아이콘을 눌러 인증 정보를 복사한 후 앱 페이지로 돌아가 입력하고 계속 진행할 수 있습니다.</li>
-    </ol>`,
+                content: '복사 아이콘을 눌러 인증 정보를 복사한 후 앱 페이지로 돌아가 붙여넣기하고 계속 진행하세요.',
                 placeholder: '매개변수 처리 중...',
-                copyButton: '복사',
                 copySuccess: '복사됨',
-                buttonPlaceholder: '클릭하여 이동',
-                noParamsTitle: '매개변수 없음',
-                noParamsContent: '페이지가 자동으로 닫힙니다',
                 copyFailed: '복사에 실패했습니다. 수동으로 복사하세요',
                 encodingFailed: '매개변수 처리에 실패했습니다',
-                settingsTitle: 'IP 주소 설정',
-                addressPlaceholder: 'Xiaomi Miloco 웹페이지 주소를 입력하세요, 예: https://192.168.31.100:8000',
-                settingsSaved: '설정이 저장되었습니다',
-                settingsCancel: '취소',
-                settingsSave: '저장',
-                settingsRequired: '먼저 IP 주소를 설정하세요',
-                settingsInvalidIP: '유효한 IP 주소를 입력하세요, 형식: https://192.168.31.100:8000',
-                noParamsToSend: '전송할 매개변수가 없습니다',
-                requestFailed: '요청에 실패했습니다',
+                noParamsTitle: '매개변수 없음',
+                noParamsContent: '유효한 인증 매개변수가 수신되지 않았습니다. 인증을 다시 시작해주세요.',
+                noParamsPlaceholder: '매개변수가 없습니다',
                 closeHintTitle: '페이지를 수동으로 닫아주세요',
                 closeHintContent: '브라우저 보안 제한으로 인해 이 페이지를 수동으로 닫아주세요',
-                updateSuccessTitle: '주소가 업데이트되었습니다',
-                updateSuccessContent: '주소가 업데이트되었습니다, 현재 리다이렉트 주소는：\r\n',
-                updateErrorTitle: '잘못된 주소',
-                noParamsCopyTitle: '복사할 매개변수가 없습니다',
-                noParamsJumpTitle: '이동할 매개변수가 없습니다',
-                noParamsPlaceholder: '매개변수가 없습니다'
+                errorTitle: '인증 실패',
+                errorContent: 'Xiaomi 계정 인증이 완료되지 않았습니다. 인증을 다시 시작해주세요.',
+                oauthErrors: {
+                    'access_denied': '사용자가 인증 요청을 거부했습니다',
+                    'invalid_request': '인증 요청 매개변수가 유효하지 않습니다',
+                    'unauthorized_client': '앱이 이 인증 요청을 시작할 수 없습니다',
+                    'unsupported_response_type': '지원되지 않는 인증 유형입니다',
+                    'invalid_scope': '요청한 권한 범위가 유효하지 않습니다',
+                    'server_error': 'Xiaomi 서버 내부 오류',
+                    'temporarily_unavailable': 'Xiaomi 서비스를 일시적으로 사용할 수 없습니다'
+                }
             }
         };
 
         function getBrowserLanguage() {
-            const language = navigator.language || navigator.userLanguage;
-            const langCode = language.toLowerCase();
-            if (langCode.startsWith('zh-cn') || langCode.startsWith('zh-hans')) {
-                return 'zh-CN';
-            } else if (langCode.startsWith('zh-tw') || langCode.startsWith('zh-hant')) {
-                return 'zh-TW';
-            } else if (langCode.startsWith('ja')) {
-                return 'ja';
-            } else if (langCode.startsWith('ko')) {
-                return 'ko';
-            } else if (langCode.startsWith('en')) {
-                return 'en';
-            } else {
-                return 'zh-CN'; // 默认中文简体
-            }
-        }
-
-        // 应用语言
-        function applyLanguage(langCode) {
-            const lang = translations[langCode] || translations['zh-CN'];
-            document.getElementById('pageTitle').textContent = lang.title;
-            document.getElementById('titleArea').textContent = lang.title;
-            document.getElementById('contentArea').innerHTML = lang.content;
-
-            const textInput = document.getElementById('textInput');
-            if (textInput) {
-                textInput.placeholder = lang.placeholder;
-            }
-
-            const copyButton = document.querySelector('.copy-button');
-            if (copyButton) {
-                copyButton.title = lang.copyButton;
-            }
-
-
-            const mainButton = document.getElementById('buttonArea');
-            if (mainButton) {
-                mainButton.textContent = lang.buttonPlaceholder;
-            }
-
-            const addressDisplay = document.getElementById('addressDisplay');
-            if (addressDisplay && lang.addressPlaceholder) {
-                addressDisplay.placeholder = lang.addressPlaceholder;
-            }
-        }
-
-        function setCookie(name, value, days = 365) {
-            const expires = new Date();
-            expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
-            document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/`;
-        }
-
-        function getCookie(name) {
-            const nameEQ = name + "=";
-            const ca = document.cookie.split(';');
-            for (let i = 0; i < ca.length; i++) {
-                let c = ca[i];
-                while (c.charAt(0) === ' ') c = c.substring(1, c.length);
-                if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
-            }
-            return null;
-        }
-
-
-        function updateJumpHref() {
-            const jumpBtn = document.getElementById('buttonArea');
-            const authRedirectUrl = getCookie('authRedirectUrl');
-            if (!authRedirectUrl) {
-                jumpBtn.href = '#';
-                jumpBtn.setAttribute('disabled', 'disabled');
-                jumpBtn.style.pointerEvents = 'none';
-                jumpBtn.style.opacity = '0.5';
-                return;
-            }
-            const params = window.location.search || '';
-            jumpBtn.href = authRedirectUrl + (params.startsWith('?') ? params : '');
-            jumpBtn.removeAttribute('disabled');
-            jumpBtn.style.pointerEvents = '';
-            jumpBtn.style.opacity = '';
-        }
-
-        function updateAddressDisplay() {
-            const addressDisplay = document.getElementById('addressDisplay');
-            const authRedirectUrl = getCookie('authRedirectUrl');
-            if (authRedirectUrl) {
-                addressDisplay.value = authRedirectUrl;
-            } else {
-                addressDisplay.value = '';
-            }
-            updateJumpHref();
-        }
-
-        function handleJump() {
-            const jumpBtn = document.getElementById('buttonArea');
-            jumpBtn.textContent = '跳转中...';
-            jumpBtn.style.pointerEvents = 'none';
-            jumpBtn.style.opacity = '0.7';
-
-            let authRedirectUrl = getCookie('authRedirectUrl');
-            if (!authRedirectUrl) {
-                const currentLang = getBrowserLanguage();
-                const lang = translations[currentLang] || translations['zh-CN'];
-                alert(lang.settingsRequired || '请先设置IP地址');
-                jumpBtn.textContent = lang.buttonPlaceholder || '点击跳转';
-                jumpBtn.style.pointerEvents = '';
-                jumpBtn.style.opacity = '';
-                return false;
-            }
-
-            if (!/^https?:\/\//.test(authRedirectUrl)) {
-                authRedirectUrl = 'https://' + authRedirectUrl;
-            }
-
-            const params = window.location.search || '';
-            const jumpUrl = authRedirectUrl + '/api/miot/xiaomi_home_callback' + (params.startsWith('?') ? params : '');
-
-            jumpBtn.href = jumpUrl;
-
-            setTimeout(() => {
-                window.location.href = jumpUrl;
-            }, 100);
-
-            return false;
+            var language = navigator.language || navigator.userLanguage;
+            var langCode = language.toLowerCase();
+            if (langCode.startsWith('zh-cn') || langCode.startsWith('zh-hans')) return 'zh-CN';
+            if (langCode.startsWith('zh-tw') || langCode.startsWith('zh-hant')) return 'zh-TW';
+            if (langCode.startsWith('ja')) return 'ja';
+            if (langCode.startsWith('ko')) return 'ko';
+            if (langCode.startsWith('en')) return 'en';
+            return 'zh-CN';
         }
 
         function detectThemeChange() {
-            const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-
+            var mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
             function handleThemeChange(e) {
                 if (e.matches) {
                     document.body.classList.add('dark-theme');
@@ -661,241 +424,74 @@
                     document.body.classList.remove('dark-theme');
                 }
             }
-
             handleThemeChange(mediaQuery);
-
             mediaQuery.addEventListener('change', handleThemeChange);
         }
 
         function selectAllText() {
-            const textInput = document.getElementById('textInput');
+            var textInput = document.getElementById('textInput');
             textInput.select();
             textInput.setSelectionRange(0, 99999);
         }
 
         function copyText() {
-            const textInput = document.getElementById('textInput');
+            var textInput = document.getElementById('textInput');
+            var currentLang = getBrowserLanguage();
+            var lang = translations[currentLang] || translations['zh-CN'];
 
             textInput.select();
             textInput.setSelectionRange(0, 99999);
 
             try {
                 if (navigator.clipboard && window.isSecureContext) {
-                    navigator.clipboard.writeText(textInput.value).then(() => {
+                    navigator.clipboard.writeText(textInput.value).then(function () {
                         showCopySuccess();
-                    }).catch(() => {
-                        fallbackCopy();
+                    }).catch(function () {
+                        fallbackCopy(lang);
                     });
                 } else {
-                    fallbackCopy();
+                    fallbackCopy(lang);
                 }
             } catch (err) {
-                console.error('copy failed:', err);
-                const currentLang = getBrowserLanguage();
-                const lang = translations[currentLang] || translations['zh-CN'];
                 alert(lang.copyFailed);
             }
         }
 
-        function fallbackCopy() {
-            const textInput = document.getElementById('textInput');
-            const success = document.execCommand('copy');
+        function fallbackCopy(lang) {
+            var textInput = document.getElementById('textInput');
+            var success = document.execCommand('copy');
             if (success) {
                 showCopySuccess();
             } else {
-                const currentLang = getBrowserLanguage();
-                const lang = translations[currentLang] || translations['zh-CN'];
                 alert(lang.copyFailed);
             }
         }
 
         function showCopySuccess() {
-            const copyButton = document.querySelector('.copy-button');
-            const copyIcon = copyButton.querySelector('.copy-icon');
-            const currentLang = getBrowserLanguage();
-            const lang = translations[currentLang] || translations['zh-CN'];
-
-            const originalIcon = copyIcon.innerHTML;
+            var currentLang = getBrowserLanguage();
+            var lang = translations[currentLang] || translations['zh-CN'];
+            var copyButton = document.querySelector('.copy-button');
+            var copyIcon = copyButton.querySelector('.copy-icon');
+            var originalIcon = copyIcon.innerHTML;
 
             copyIcon.innerHTML = '<path d="M9 16.17L4.83 12L3.41 13.41L9 19L21 7L19.59 5.59L9 16.17Z"/>';
             copyButton.style.backgroundColor = '#4CAF50';
             copyButton.title = lang.copySuccess;
 
-            setTimeout(() => {
+            setTimeout(function () {
                 copyIcon.innerHTML = originalIcon;
                 copyButton.style.backgroundColor = '#ff5c00';
-                copyButton.title = lang.copyButton;
+                copyButton.title = lang.copyLabel || '复制';
             }, 2000);
         }
 
-        function getUrlParams() {
-            const params = {};
-
-            if (typeof URLSearchParams !== 'undefined') {
-                try {
-                    const urlParams = new URLSearchParams(window.location.search);
-
-                    for (const [key, value] of urlParams.entries()) {
-                        params[key] = value;
-                    }
-                } catch (error) {
-                    console.error('URLSearchParams parse failed:', error);
-                    return getUrlParamsFallback();
-                }
-            } else {
-                console.log('browser does not support URLSearchParams, use traditional method to parse URL parameters');
-                return getUrlParamsFallback();
-            }
-            return params;
-        }
-
-        function getUrlParamsFallback() {
-            console.log('use traditional method to parse URL parameters');
-            const params = {};
-            const queryString = window.location.search.substring(1);
-
-            if (queryString) {
-                const pairs = queryString.split('&');
-                for (let i = 0; i < pairs.length; i++) {
-                    const pair = pairs[i].split('=');
-                    if (pair.length === 2) {
-                        const key = decodeURIComponent(pair[0]);
-                        const value = decodeURIComponent(pair[1]);
-                        params[key] = value;
-                    }
-                }
-            }
-            return params;
-        }
-
-        function encodeParamsToBase64(params) {
-            try {
-                const jsonString = JSON.stringify(params, null, 2);
-                const base64String = btoa(unescape(encodeURIComponent(jsonString)));
-                return base64String;
-            } catch (error) {
-                console.error('encode failed:', error);
-                return null;
-            }
-        }
-
-        window.onload = function () {
-            detectThemeChange();
-
-            const currentLang = getBrowserLanguage();
-            applyLanguage(currentLang);
-
-            updateAddressDisplay();
-
-            const addressDisplay = document.getElementById('addressDisplay');
-            if (addressDisplay) {
-                // 监听输入事件，自动保存到Cookie
-                addressDisplay.addEventListener('input', function (e) {
-                    const value = e.target.value.trim();
-                    if (value) {
-                        // 验证输入格式
-                        const ipOrDomainRegex = /^(https?:\/\/)?([a-zA-Z0-9-]+\.)*[a-zA-Z0-9-]+(\.[a-zA-Z]{2,})?(:\d+)?$/;
-                        if (ipOrDomainRegex.test(value)) {
-                            let finalValue = value;
-                            if (!/^https?:\/\//.test(value)) {
-                                finalValue = 'https://' + value;
-                            }
-                            setCookie('authRedirectUrl', finalValue);
-                            updateJumpHref();
-                        }
-                    } else {
-                        setCookie('authRedirectUrl', '');
-                        updateJumpHref();
-                    }
-                });
-
-                addressDisplay.addEventListener('blur', function (e) {
-                    const value = e.target.value.trim();
-                    if (value) {
-                        const ipOrDomainRegex = /^(https?:\/\/)?([a-zA-Z0-9-]+\.)*[a-zA-Z0-9-]+(\.[a-zA-Z]{2,})?(:\d+)?$/;
-                        if (ipOrDomainRegex.test(value)) {
-                            let finalValue = value;
-                            if (!/^https?:\/\//.test(value)) {
-                                finalValue = 'https://' + value;
-                            }
-                            setCookie('authRedirectUrl', finalValue);
-                            e.target.value = finalValue;
-                            updateJumpHref();
-                        }
-                    }
-                });
-            }
-
-            const params = getUrlParams();
-
-            if (
-                params.method === 'setRedirectUrl' &&
-                typeof params.params === 'string'
-            ) {
-                const lang = translations[currentLang] || translations['zh-CN'];
-                let ip = params.params.trim();
-                const ipOrDomainRegex = /^(https?:\/\/)?([a-zA-Z0-9-]+\.)*[a-zA-Z0-9-]+(\.[a-zA-Z]{2,})?(:\d+)?$/;
-                let isValid = ipOrDomainRegex.test(ip);
-                if (isValid && !/^https?:\/\//.test(ip)) {
-                    ip = 'https://' + ip;
-                }
-                if (isValid) {
-                    setCookie('authRedirectUrl', ip);
-                    updateAddressDisplay();
-                    showMsgHint(
-                        lang.updateSuccessTitle || '地址更新成功',
-                        (lang.updateSuccessContent || '当前跳转地址为：\r\n') + ip
-                    );
-                } else {
-                    showMsgHint(
-                        lang.updateErrorTitle || '地址无效',
-                        lang.settingsInvalidIP || '请输入完整地址（如：https://192.168.31.100:8000）',
-                        true
-                    );
-                }
-                return;
-            }
-
-            if (Object.keys(params).length === 0) {
-                console.log('no params, disable related buttons');
-
-                const lang = translations[currentLang] || translations['zh-CN'];
-
-                const copyButton = document.querySelector('.copy-button');
-                if (copyButton) {
-                    copyButton.style.pointerEvents = 'none';
-                    copyButton.style.opacity = '0.5';
-                    copyButton.title = lang.noParamsCopyTitle || '无参数可复制';
-                }
-
-                const jumpBtn = document.getElementById('buttonArea');
-                if (jumpBtn) {
-                    jumpBtn.style.pointerEvents = 'none';
-                    jumpBtn.style.opacity = '0.5';
-                    jumpBtn.href = '#';
-                    jumpBtn.onclick = null;
-                    jumpBtn.title = lang.noParamsJumpTitle || '无参数可跳转';
-                }
-
-                const textInput = document.getElementById('textInput');
-                if (textInput) {
-                    textInput.value = '';
-                    textInput.placeholder = lang.noParamsPlaceholder || '无参数传入';
-                }
-
-                return;
-            }
-
-            const encodedData = encodeParamsToBase64(params);
-
-            if (encodedData) {
-                const textInput = document.getElementById('textInput');
-                textInput.value = encodedData;
-            } else {
-                console.error('params encoding failed');
-                const lang = translations[currentLang] || translations['zh-CN'];
-                alert(lang.encodingFailed);
-            }
+        function esc(str) {
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
         }
 
         function closePage() {
@@ -903,88 +499,78 @@
                 window.opener = null;
                 window.open('', '_self');
                 window.close();
-
                 setTimeout(function () {
-                    if (!window.closed) {
-                        showCloseHint();
-                    }
+                    if (!window.closed) showCloseHint();
                 }, 200);
             } catch (error) {
-                console.log('close page failed:', error);
                 showCloseHint();
             }
         }
 
         function showCloseHint() {
-            const currentLang = getBrowserLanguage();
-            const lang = translations[currentLang] || translations['zh-CN'];
-
-            const frame = document.querySelector('.frame');
-            if (frame) {
-                frame.style.display = 'none';
-            }
-
-            const closeHint = document.createElement('div');
-            closeHint.id = 'closeHint';
-            closeHint.style.cssText = `
-                position: fixed;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                background: white;
-                padding: 40px;
-                border-radius: 8px;
-                box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
-                text-align: center;
-                z-index: 10000;
-                max-width: 90%;
-                width: 400px;
-            `;
-
-            closeHint.innerHTML = `
-                <div style="font-size: 20px; font-weight: 500; margin-bottom: 20px; color: #000;">${lang.closeHintTitle || '请手动关闭页面'}</div>
-                <div style="color: rgba(0, 0, 0, 0.6); line-height: 1.5;">${lang.closeHintContent || '由于浏览器安全限制，请手动关闭此页面'}</div>
-            `;
-
-            document.body.appendChild(closeHint);
-
-            if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-                closeHint.style.background = '#1e1e1e';
-                closeHint.style.color = '#ffffff';
-                closeHint.querySelector('div:first-child').style.color = '#ffffff';
-                closeHint.querySelector('div:last-child').style.color = 'rgba(255, 255, 255, 0.7)';
+            var currentLang = getBrowserLanguage();
+            var lang = translations[currentLang] || translations['zh-CN'];
+            var hint = document.getElementById('closeHint');
+            if (hint) {
+                hint.textContent = lang.closeHintContent;
+                hint.style.display = 'block';
             }
         }
 
-        function showMsgHint(title, content, isError) {
-            const frame = document.querySelector('.frame');
-            if (frame) frame.style.display = 'none';
-            const old = document.getElementById('msgHint');
-            if (old) old.remove();
-            const isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-            const msgHint = document.createElement('div');
-            msgHint.id = 'msgHint';
-            msgHint.style.cssText = `
-                position: fixed;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                background: ${isDark ? '#1e1e1e' : 'white'};
-                padding: 40px;
-                border-radius: 8px;
-                box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
-                text-align: center;
-                z-index: 10000;
-                max-width: 90%;
-                width: 400px;
-                color: ${isDark ? '#fff' : '#000'};
-            `;
-            msgHint.innerHTML = `
-                <div style="font-size: 20px; font-weight: 500; margin-bottom: 20px; color: ${isDark ? (isError ? '#ff5c00' : '#fff') : (isError ? '#ff5c00' : '#000')};">${title}</div>
-                <div style="color: ${isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)'}; line-height: 1.5;">${content}</div>
-            `;
-            document.body.appendChild(msgHint);
-        }
+        window.onload = function () {
+            detectThemeChange();
+
+            var currentLang = getBrowserLanguage();
+            var lang = translations[currentLang] || translations['zh-CN'];
+
+            var urlParams = new URLSearchParams(window.location.search);
+            var code = urlParams.get('code');
+            var state = urlParams.get('state');
+            var oauthError = urlParams.get('error');
+            var oauthErrorDesc = urlParams.get('error_description');
+
+            // OAuth 明确错误
+            if (oauthError) {
+                var friendlyMsg = (lang.oauthErrors && lang.oauthErrors[oauthError]) || lang.errorTitle;
+                document.getElementById('pageTitle').textContent = lang.errorTitle;
+                document.getElementById('titleArea').textContent = lang.errorTitle;
+                document.getElementById('authInfoContainer').style.display = 'none';
+                var contentArea = document.getElementById('contentArea');
+                contentArea.textContent = lang.errorContent;
+                if (oauthErrorDesc) {
+                    var descEl = document.createElement('span');
+                    descEl.style.cssText = 'display:block;font-size:14px;opacity:.7;';
+                    descEl.textContent = oauthErrorDesc;
+                    contentArea.appendChild(descEl);
+                }
+                var codeEl = document.createElement('span');
+                codeEl.style.cssText = 'display:block;font-size:13px;opacity:.5;';
+                codeEl.textContent = '(' + friendlyMsg + ')';
+                contentArea.appendChild(codeEl);
+                return;
+            }
+
+            // 无参数
+            if (!code || !state) {
+                document.getElementById('pageTitle').textContent = lang.noParamsTitle;
+                document.getElementById('titleArea').textContent = lang.noParamsTitle;
+                document.getElementById('authInfoContainer').style.display = 'none';
+                document.getElementById('contentArea').textContent = lang.noParamsContent;
+                return;
+            }
+
+            // 成功：编码并展示
+            document.getElementById('pageTitle').textContent = lang.title;
+            document.getElementById('titleArea').textContent = lang.title;
+            document.getElementById('contentArea').textContent = lang.content;
+
+            try {
+                var encoded = btoa(unescape(encodeURIComponent(JSON.stringify({ code: code, state: state }))));
+                document.getElementById('textInput').value = encoded;
+            } catch (e) {
+                alert(lang.encodingFailed);
+            }
+        };
     </script>
 </body>
 
